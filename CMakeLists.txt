@@ -13,6 +13,8 @@ set(PROGRAM_SOURCE
 set(SHADER_SOURCE
     src/shaders/mesh.vert.glsl
     src/shaders/mesh.frag.glsl
+    src/shaders/postprocess.vert.glsl
+    src/shaders/postprocess.frag.glsl
 )
 
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)

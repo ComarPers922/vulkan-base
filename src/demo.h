@@ -37,6 +37,7 @@ private:
     } gpu_times{};
 
     Vk_Image depth_buffer_image;
+    Vk_Image post_process_image;
     VkDescriptorSetLayout descriptor_set_layout;
     VkPipelineLayout pipeline_layout;
     VkPipeline pipeline;

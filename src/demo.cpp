@@ -140,8 +140,11 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     // Pipeline.
     Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
     {
-		Vk_Shader_Module vertex_shader(get_resource_path("spirv/mesh.vert.spv"));
-		Vk_Shader_Module fragment_shader(get_resource_path("spirv/mesh.frag.spv"));
+        Vk_Shader_Module vertex_shader(get_resource_path("spirv/mesh.vert.spv"));
+        Vk_Shader_Module fragment_shader(get_resource_path("spirv/mesh.frag.spv"));
+
+		Vk_Shader_Module post_process_vertex_shader(get_resource_path("spirv/postprocess.vert.spv"));
+		Vk_Shader_Module post_process_fragment_shader(get_resource_path("spirv/postprocess.frag.spv"));
 
         // VkVertexInputBindingDescription
         state.vertex_bindings[0].binding = 0;
@@ -282,6 +285,7 @@ void Vk_Demo::shutdown() {
 }
 
 void Vk_Demo::release_resolution_dependent_resources() {
+    post_process_image.destroy();
     depth_buffer_image.destroy();
 }
 
@@ -290,6 +294,9 @@ void Vk_Demo::restore_resolution_dependent_resources() {
     VkFormat depth_format = get_depth_image_format();
     depth_buffer_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, depth_format,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, "depth_buffer");
+
+    post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
 
     vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
         const VkImageSubresourceRange subresource_range{ VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
@@ -380,6 +387,64 @@ void Vk_Demo::draw_frame() {
 
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
+
+    vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+    vk_cmd_image_barrier(vk.command_buffer, post_process_image.handle,
+        VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    vkCmdEndRendering(vk.command_buffer);
+
+    auto copyInfo = VkCopyImageInfo2{ VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2 };
+    copyInfo.srcImage = vk.swapchain_info.images[vk.swapchain_image_index];
+    copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    copyInfo.dstImage = post_process_image.handle;
+    copyInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+    auto copyRegion = VkImageCopy2{ VK_STRUCTURE_TYPE_IMAGE_COPY_2 };
+    copyRegion.srcOffset = { 0, 0, 0 };
+    copyRegion.dstOffset = { 0, 0, 0 };
+    copyRegion.extent = { vk.surface_size.width, vk.surface_size.height, 0 };
+    copyRegion.srcSubresource = {
+        .aspectMask =  VK_IMAGE_ASPECT_COLOR_BIT,
+        .mipLevel = 0,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    };
+    copyRegion.dstSubresource = {
+	    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+	    .mipLevel = 0,
+	    .baseArrayLayer = 0,
+	    .layerCount = 1,
+    };
+
+    copyInfo.regionCount = 1;
+    copyInfo.pRegions = &copyRegion;
+
+    vkCmdCopyImage2(vk.command_buffer, &copyInfo);
+
+    color_attachment.imageView = vk.swapchain_info.image_views[vk.swapchain_image_index];
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.clearValue.color = { 0.32f, 0.32f, 0.4f, 0.0f };
+
+    depth_attachment.imageView = depth_buffer_image.view;
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.clearValue.depthStencil = { 1.f, 0 };
+
+    vkCmdBeginRendering(vk.command_buffer, &rendering_info);
+    vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL);
 
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRendering(vk.command_buffer);
