@@ -303,40 +303,24 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         );
         assert(post_process_descriptor_buffer.device_address % descriptor_buffer_properties.descriptorBufferOffsetAlignment == 0);
 
-        // Write descriptor 0 (uniform buffer)
-        //{
-        //    VkDescriptorAddressInfoEXT address_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT };
-        //    address_info.address = uniform_buffer.device_address;
-        //    address_info.range = sizeof(Matrix4x4);
-
-        //    VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
-        //    descriptor_info.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        //    descriptor_info.data.pUniformBuffer = &address_info;
-
-        //    VkDeviceSize offset;
-        //    vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 0, &offset);
-        //    vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.uniformBufferDescriptorSize,
-        //        (uint8_t*)mapped_descriptor_buffer_ptr + offset);
-        //}
-
-        post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
-            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
+        //post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
+        //    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
 
         // Write descriptor 1 (sampled image)
-        {
-            VkDescriptorImageInfo image_info;
-            image_info.imageView = post_process_image.view;
-            image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        //{
+        //    VkDescriptorImageInfo image_info;
+        //    image_info.imageView = post_process_image.view;
+        //    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
-            descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-            descriptor_info.data.pSampledImage = &image_info;
+        //    VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+        //    descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        //    descriptor_info.data.pSampledImage = &image_info;
 
-            VkDeviceSize offset;
-            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 1, &offset);
-            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.sampledImageDescriptorSize,
-                static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
-        }
+        //    VkDeviceSize offset;
+        //    vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 1, &offset);
+        //    vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.sampledImageDescriptorSize,
+        //        static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
+        //}
 
         // Write descriptor 2 (sampler)
         {
@@ -387,6 +371,7 @@ void Vk_Demo::shutdown() {
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    post_process_image.destroy();
     release_resolution_dependent_resources();
     quad_mesh.destroy();
     gpu_mesh.destroy();
@@ -414,11 +399,29 @@ void Vk_Demo::release_resolution_dependent_resources() {
 void Vk_Demo::restore_resolution_dependent_resources() {
     // create depth buffer
     VkFormat depth_format = get_depth_image_format();
-    //if (depth_buffer_image.handle == nullptr)
-    //{
-    //    post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
-    //        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
-    //}
+    // if (depth_buffer_image.handle == nullptr)
+    {
+        post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
+    }
+    VkDescriptorImageInfo image_info;
+    image_info.imageView = post_process_image.view;
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+    descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+
+    descriptor_info.data.pSampledImage = &image_info;
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT };
+    VkPhysicalDeviceProperties2 physical_device_properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+    physical_device_properties.pNext = &descriptor_buffer_properties;
+    vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
+
+    VkDeviceSize offset;
+    vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 1, &offset);
+    vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.sampledImageDescriptorSize,
+        static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
+
     depth_buffer_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, depth_format,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, "depth_buffer");
 

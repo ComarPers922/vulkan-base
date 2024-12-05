@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
         error("glfwInit failed");
     }
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     GLFWwindow* glfw_window = glfwCreateWindow(window_width, window_height, "Vulkan demo", nullptr, nullptr);
     assert(glfw_window != nullptr);
     glfwSetKeyCallback(glfw_window, glfw_key_callback);
