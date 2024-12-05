@@ -9,4 +9,5 @@ layout(binding=2) uniform sampler input_image_sampler;
 
 void main() {
     color_attachment0 = texture(sampler2D(input_image, input_image_sampler), frag_uv);
+    color_attachment0 *= vec4(2., 0., 0., 1.);
 }

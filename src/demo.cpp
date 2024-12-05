@@ -7,6 +7,8 @@
 
 #include <array>
 
+#include "Constants.h"
+
 static VkFormat get_depth_image_format() {
     VkFormat candidates[2] = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_X8_D24_UNORM_PACK32 };
     for (auto format : candidates) {
@@ -103,6 +105,19 @@ void Vk_Demo::initialize(GLFWwindow* window) {
             gpu_mesh.index_buffer = vk_create_buffer(size, usage, mesh.indices.data(), "index_buffer");
             gpu_mesh.index_count = uint32_t(mesh.indices.size());
         }
+
+        {
+            const VkDeviceSize size = quad.vertices.size() * sizeof(quad.vertices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            quad_mesh.vertex_buffer = vk_create_buffer(size, usage, quad.vertices.data(), "post-process-vertex_buffer");
+            quad_mesh.vertex_count = static_cast<uint32_t>(quad.vertices.size());
+        }
+        {
+            const VkDeviceSize size = quad.indices.size() * sizeof(quad.indices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            quad_mesh.index_buffer = vk_create_buffer(size, usage, quad.indices.data(), "post-process-index_buffer");
+            quad_mesh.index_count = static_cast<uint32_t>(quad.indices.size());
+        }
     }
 
     // Texture.
@@ -135,16 +150,18 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         .sampler(2, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create("set_layout");
 
-    pipeline_layout = vk_create_pipeline_layout({ descriptor_set_layout }, {}, "pipeline_layout");
+    post_process_descriptor_set_layout = Vk_Descriptor_Set_Layout()
+        .sampled_image(1, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .sampler(2, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .create("post_process_set_layout");
 
+    pipeline_layout = vk_create_pipeline_layout({ descriptor_set_layout }, {}, "pipeline_layout");
+    post_process_pipeline_layout = vk_create_pipeline_layout({ post_process_descriptor_set_layout }, {}, "post_process_pipeline_layout");
     // Pipeline.
     Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
     {
         Vk_Shader_Module vertex_shader(get_resource_path("spirv/mesh.vert.spv"));
         Vk_Shader_Module fragment_shader(get_resource_path("spirv/mesh.frag.spv"));
-
-		Vk_Shader_Module post_process_vertex_shader(get_resource_path("spirv/postprocess.vert.spv"));
-		Vk_Shader_Module post_process_fragment_shader(get_resource_path("spirv/postprocess.frag.spv"));
 
         // VkVertexInputBindingDescription
         state.vertex_bindings[0].binding = 0;
@@ -170,6 +187,41 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         state.depth_attachment_format = get_depth_image_format();
 
         pipeline = vk_create_graphics_pipeline(state, vertex_shader.handle, fragment_shader.handle, pipeline_layout, "draw_mesh_pipeline");
+    }
+
+    Vk_Graphics_Pipeline_State post_process_state = get_default_graphics_pipeline_state();
+    {
+        Vk_Shader_Module post_process_vertex_shader(get_resource_path("spirv/postprocess.vert.spv"));
+        Vk_Shader_Module post_process_fragment_shader(get_resource_path("spirv/postprocess.frag.spv"));
+
+        // VkVertexInputBindingDescription
+        post_process_state.vertex_bindings[0].binding = 0;
+        post_process_state.vertex_bindings[0].stride = sizeof(Vertex);
+        post_process_state.vertex_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        post_process_state.vertex_binding_count = 1;
+
+        // VkVertexInputAttributeDescription
+        post_process_state.vertex_attributes[0].location = 0; // position
+        post_process_state.vertex_attributes[0].binding = 0;
+        post_process_state.vertex_attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        post_process_state.vertex_attributes[0].offset = 0;
+
+        post_process_state.vertex_attributes[1].location = 1; // uv
+        post_process_state.vertex_attributes[1].binding = 0;
+        post_process_state.vertex_attributes[1].format = VK_FORMAT_R32G32_SFLOAT;
+        post_process_state.vertex_attributes[1].offset = 12;
+
+        post_process_state.vertex_attribute_count = 2;
+
+        post_process_state.color_attachment_formats[0] = vk.surface_format.format;
+        post_process_state.color_attachment_count = 1;
+        post_process_state.depth_attachment_format = get_depth_image_format();
+
+        post_process_pipeline = vk_create_graphics_pipeline(
+            post_process_state,
+            post_process_vertex_shader.handle, post_process_fragment_shader.handle,
+            post_process_pipeline_layout,
+            "post_process_draw_mesh_pipeline");
     }
 
     // Descriptor buffer.
@@ -234,6 +286,71 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         }
     }
 
+    // Descriptor buffer.
+    {
+        VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT };
+        VkPhysicalDeviceProperties2 physical_device_properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+        physical_device_properties.pNext = &descriptor_buffer_properties;
+        vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
+
+        VkDeviceSize layout_size_in_bytes = 0;
+        vkGetDescriptorSetLayoutSizeEXT(vk.device, post_process_descriptor_set_layout, &layout_size_in_bytes);
+
+        post_process_descriptor_buffer = vk_create_mapped_buffer(
+            layout_size_in_bytes,
+            VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT,
+            &post_process_mapped_descriptor_buffer_ptr, "post_process_descriptor_buffer"
+        );
+        assert(post_process_descriptor_buffer.device_address % descriptor_buffer_properties.descriptorBufferOffsetAlignment == 0);
+
+        // Write descriptor 0 (uniform buffer)
+        //{
+        //    VkDescriptorAddressInfoEXT address_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT };
+        //    address_info.address = uniform_buffer.device_address;
+        //    address_info.range = sizeof(Matrix4x4);
+
+        //    VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+        //    descriptor_info.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        //    descriptor_info.data.pUniformBuffer = &address_info;
+
+        //    VkDeviceSize offset;
+        //    vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 0, &offset);
+        //    vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.uniformBufferDescriptorSize,
+        //        (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+        //}
+
+        post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
+
+        // Write descriptor 1 (sampled image)
+        {
+            VkDescriptorImageInfo image_info;
+            image_info.imageView = post_process_image.view;
+            image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            descriptor_info.data.pSampledImage = &image_info;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 1, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.sampledImageDescriptorSize,
+                static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
+        }
+
+        // Write descriptor 2 (sampler)
+        {
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+            descriptor_info.data.pSampler = &sampler;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 2, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.samplerDescriptorSize,
+                static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
+        }
+    }
+
     // ImGui setup.
     {
         ImGui::CreateContext();
@@ -271,14 +388,19 @@ void Vk_Demo::shutdown() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     release_resolution_dependent_resources();
+    quad_mesh.destroy();
     gpu_mesh.destroy();
     texture.destroy();
+    post_process_descriptor_buffer.destroy();
     descriptor_buffer.destroy();
     uniform_buffer.destroy();
 
     vkDestroySampler(vk.device, sampler, nullptr);
+    vkDestroyDescriptorSetLayout(vk.device, post_process_descriptor_set_layout, nullptr);
     vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
+    vkDestroyPipelineLayout(vk.device, post_process_pipeline_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
+    vkDestroyPipeline(vk.device, post_process_pipeline, nullptr);
     vkDestroyPipeline(vk.device, pipeline, nullptr);
 
     vk_shutdown();
@@ -292,11 +414,13 @@ void Vk_Demo::release_resolution_dependent_resources() {
 void Vk_Demo::restore_resolution_dependent_resources() {
     // create depth buffer
     VkFormat depth_format = get_depth_image_format();
+    //if (depth_buffer_image.handle == nullptr)
+    //{
+    //    post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
+    //        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
+    //}
     depth_buffer_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, depth_format,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, "depth_buffer");
-
-    post_process_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "post_process");
 
     vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
         const VkImageSubresourceRange subresource_range{ VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
@@ -388,17 +512,18 @@ void Vk_Demo::draw_frame() {
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
 
+    vkCmdEndRendering(vk.command_buffer);
+
     vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
-        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_2_COPY_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     vk_cmd_image_barrier(vk.command_buffer, post_process_image.handle,
         VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
         VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_2_COPY_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    vkCmdEndRendering(vk.command_buffer);
 
     auto copyInfo = VkCopyImageInfo2{ VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2 };
     copyInfo.srcImage = vk.swapchain_info.images[vk.swapchain_image_index];
@@ -409,7 +534,7 @@ void Vk_Demo::draw_frame() {
     auto copyRegion = VkImageCopy2{ VK_STRUCTURE_TYPE_IMAGE_COPY_2 };
     copyRegion.srcOffset = { 0, 0, 0 };
     copyRegion.dstOffset = { 0, 0, 0 };
-    copyRegion.extent = { vk.surface_size.width, vk.surface_size.height, 0 };
+    copyRegion.extent = { vk.surface_size.width, vk.surface_size.height, 1 };
     copyRegion.srcSubresource = {
         .aspectMask =  VK_IMAGE_ASPECT_COLOR_BIT,
         .mipLevel = 0,
@@ -428,25 +553,45 @@ void Vk_Demo::draw_frame() {
 
     vkCmdCopyImage2(vk.command_buffer, &copyInfo);
 
-    color_attachment.imageView = vk.swapchain_info.image_views[vk.swapchain_image_index];
-    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment.clearValue.color = { 0.32f, 0.32f, 0.4f, 0.0f };
+    //color_attachment.imageView = vk.swapchain_info.image_views[vk.swapchain_image_index];
+    //color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    //color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    //color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    //color_attachment.clearValue.color = { 0.32f, 0.32f, 0.4f, 0.0f };
 
-    depth_attachment.imageView = depth_buffer_image.view;
-    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depth_attachment.clearValue.depthStencil = { 1.f, 0 };
+    //depth_attachment.imageView = depth_buffer_image.view;
+    //depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    //depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    //depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    //depth_attachment.clearValue.depthStencil = { 1.f, 0 };
+
+    vk_cmd_image_barrier(vk.command_buffer, post_process_image.handle,
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL);
+
+    VkDescriptorBufferBindingInfoEXT post_process_descriptor_buffer_binding_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT };
+    post_process_descriptor_buffer_binding_info.address = post_process_descriptor_buffer.device_address;
+    post_process_descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
+    vkCmdBindDescriptorBuffersEXT(vk.command_buffer, 1, &post_process_descriptor_buffer_binding_info);
 
     vkCmdBeginRendering(vk.command_buffer, &rendering_info);
-    vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
-        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL);
+    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &quad_mesh.vertex_buffer.handle, &zero_offset);
+    vkCmdBindIndexBuffer(vk.command_buffer, quad_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
+    //vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &quad_mesh.vertex_buffer.handle, &zero_offset);
+    //vkCmdBindIndexBuffer(vk.command_buffer, quad_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdSetDescriptorBufferOffsetsEXT(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_process_pipeline_layout, 0, 1, &buffer_index, &set_offset);
+
+    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_process_pipeline);
+    vkCmdDrawIndexed(vk.command_buffer, quad_mesh.index_count, 1, 0, 0, 0);
+    // ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRendering(vk.command_buffer);
 
     vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],

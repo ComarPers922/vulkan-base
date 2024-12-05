@@ -29,8 +29,8 @@ static bool parse_command_line(int argc, char** argv) {
     return true;
 }
 
-static int window_width = 720;
-static int window_height = 720;
+static int window_width = 1024;
+static int window_height = 1024;
 
 static void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
@@ -70,6 +70,7 @@ int main(int argc, char** argv) {
         error("glfwInit failed");
     }
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     GLFWwindow* glfw_window = glfwCreateWindow(window_width, window_height, "Vulkan demo", nullptr, nullptr);
     assert(glfw_window != nullptr);
     glfwSetKeyCallback(glfw_window, glfw_key_callback);

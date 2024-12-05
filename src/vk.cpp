@@ -43,10 +43,14 @@ static void create_instance(const std::span<const char*>& instance_extensions)
     VkApplicationInfo app_info { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     app_info.apiVersion = VK_API_VERSION_1_3;
 
+    std::vector layers{ "VK_LAYER_KHRONOS_validation" };
+
     VkInstanceCreateInfo instance_create_info{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instance_create_info.pApplicationInfo = &app_info;
     instance_create_info.enabledExtensionCount = uint32_t(instance_extensions.size());
     instance_create_info.ppEnabledExtensionNames = instance_extensions.data();
+    instance_create_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
+    instance_create_info.ppEnabledLayerNames = layers.data();
 
     VK_CHECK(vkCreateInstance(&instance_create_info, nullptr, &vk.instance));
 }

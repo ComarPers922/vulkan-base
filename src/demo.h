@@ -6,6 +6,21 @@
 
 struct GLFWwindow;
 
+struct GPU_MESH
+{
+    Vk_Buffer vertex_buffer;
+    Vk_Buffer index_buffer;
+    uint32_t vertex_count = 0;
+    uint32_t index_count = 0;
+    void destroy()
+	{
+        vertex_buffer.destroy();
+        index_buffer.destroy();
+        vertex_count = 0;
+        index_count = 0;
+    }
+};
+
 class Vk_Demo {
 public:
     void initialize(GLFWwindow* glfw_window);
@@ -39,25 +54,20 @@ private:
     Vk_Image depth_buffer_image;
     Vk_Image post_process_image;
     VkDescriptorSetLayout descriptor_set_layout;
+    VkDescriptorSetLayout post_process_descriptor_set_layout;
     VkPipelineLayout pipeline_layout;
+    VkPipelineLayout post_process_pipeline_layout;
     VkPipeline pipeline;
+    VkPipeline post_process_pipeline;
+    Vk_Buffer post_process_descriptor_buffer;
     Vk_Buffer descriptor_buffer;
+    void* post_process_mapped_descriptor_buffer_ptr = nullptr;
     void* mapped_descriptor_buffer_ptr = nullptr;
     Vk_Buffer uniform_buffer;
     void* mapped_uniform_buffer = nullptr;
     Vk_Image texture;
     VkSampler sampler;
 
-    struct {
-        Vk_Buffer vertex_buffer;
-        Vk_Buffer index_buffer;
-        uint32_t vertex_count = 0;
-        uint32_t index_count = 0;
-        void destroy() {
-            vertex_buffer.destroy();
-            index_buffer.destroy();
-            vertex_count = 0;
-            index_count = 0;
-        }
-    } gpu_mesh;
+    GPU_MESH gpu_mesh;
+    GPU_MESH quad_mesh;
 };

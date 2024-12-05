@@ -7,5 +7,5 @@ layout(location = 0) out vec2 frag_uv;
 
 void main() {
     frag_uv = in_uv;
-    gl_Position = in_position;
+    gl_Position = vec4(in_position.xy, 0.0, 1.);
 }
