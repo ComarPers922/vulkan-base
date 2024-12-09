@@ -41,6 +41,8 @@ private:
     bool show_ui = true;
     bool vsync = true;
     bool animate = false;
+    uint32_t enableFXAA = true;
+    float threshold = 0.1f;
 
     Time last_frame_time{};
     double sim_time = 0;

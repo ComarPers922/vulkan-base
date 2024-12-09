@@ -328,4 +328,10 @@ private:
     VkCommandBuffer command_buffer;
 };
 
+struct Post_Process_Push_Constatnts
+{
+    uint32_t enableFXAA;
+    float threshold;
+};
+
 #define VK_GPU_MARKER_SCOPE(command_buffer, name) GPU_Marker_Scope gpu_marker_scope##__LINE__(command_buffer, name)

@@ -92,7 +92,8 @@ void Vk_Demo::initialize(GLFWwindow* window) {
 
     // Geometry buffers.
     {
-        Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
+        // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
+        Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
         {
             const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
             VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -122,7 +123,8 @@ void Vk_Demo::initialize(GLFWwindow* window) {
 
     // Texture.
     {
-        texture = vk_load_texture(get_resource_path("model/diffuse.jpg"));
+        // texture = vk_load_texture(get_resource_path("model/diffuse.jpg"));
+        texture = vk_load_texture(get_resource_path("model/baloo_diff.png"));
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
@@ -155,8 +157,13 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         .sampler(2, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create("post_process_set_layout");
 
+    auto pushConstant = VkPushConstantRange{ };
+    pushConstant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(Post_Process_Push_Constatnts);
+
     pipeline_layout = vk_create_pipeline_layout({ descriptor_set_layout }, {}, "pipeline_layout");
-    post_process_pipeline_layout = vk_create_pipeline_layout({ post_process_descriptor_set_layout }, {}, "post_process_pipeline_layout");
+    post_process_pipeline_layout = vk_create_pipeline_layout({ post_process_descriptor_set_layout }, { pushConstant }, "post_process_pipeline_layout");
     // Pipeline.
     Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
     {
@@ -590,11 +597,15 @@ void Vk_Demo::draw_frame() {
     //vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &quad_mesh.vertex_buffer.handle, &zero_offset);
     //vkCmdBindIndexBuffer(vk.command_buffer, quad_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 
+    auto pushConstants = Post_Process_Push_Constatnts{ enableFXAA, threshold };
+
     vkCmdSetDescriptorBufferOffsetsEXT(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_process_pipeline_layout, 0, 1, &buffer_index, &set_offset);
 
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_process_pipeline);
+    vkCmdPushConstants(vk.command_buffer, post_process_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+        0, sizeof(Post_Process_Push_Constatnts), &pushConstants);
     vkCmdDrawIndexed(vk.command_buffer, quad_mesh.index_count, 1, 0, 0, 0);
-    // ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRendering(vk.command_buffer);
 
     vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
@@ -648,6 +659,10 @@ void Vk_Demo::do_imgui() {
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
             ImGui::Checkbox("Animate", &animate);
+            bool isFXAAEnabled = enableFXAA != 0;
+            ImGui::Checkbox("Enable FXAA", &isFXAAEnabled);
+            enableFXAA = isFXAAEnabled ? 1 : 0;
+            ImGui::SliderFloat("FXAA Threshold", &threshold, 0.01f, 1.f);
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
