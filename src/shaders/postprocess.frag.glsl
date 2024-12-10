@@ -6,8 +6,10 @@ layout(location = 0) out vec4 color_attachment0;
 
 layout(binding=1) uniform texture2D input_image;
 layout(binding=2) uniform sampler input_image_sampler;
+layout(binding=3) uniform texture2D prev_frame_image;
 
 #define texSampler sampler2D(input_image, input_image_sampler)
+#define texSamplerPrev sampler2D(prev_frame_image, input_image_sampler)
 
 layout( push_constant ) uniform constants
 {
@@ -16,7 +18,8 @@ layout( push_constant ) uniform constants
 } PushConstants;
 
 
-void main() {
+void main() 
+{
     if (PushConstants.enableFXAA == 0)
     {
         color_attachment0 = texture(texSampler, frag_uv);

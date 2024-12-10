@@ -34,6 +34,13 @@ private:
     void do_imgui();
     void draw_frame();
 
+    void color_attachment_transition_for_copy_src();
+    void post_process_transition_for_copy_dst(const VkImage& targetImg);
+    void simple_image_copy(const VkImage& src, const VkImage& dst, const VkExtent2D& imgExtent);
+    void color_attachment_transition_for_rendering();
+    void post_process_transition_for_rendering(const VkImage& targetImg);
+    void color_attachment_transition_for_present();
+
 private:
     using Clock = std::chrono::high_resolution_clock;
     using Time  = std::chrono::time_point<Clock>;
@@ -55,6 +62,7 @@ private:
 
     Vk_Image depth_buffer_image;
     Vk_Image post_process_image;
+    Vk_Image prev_frame_image;
     VkDescriptorSetLayout descriptor_set_layout;
     VkDescriptorSetLayout post_process_descriptor_set_layout;
     VkPipelineLayout pipeline_layout;

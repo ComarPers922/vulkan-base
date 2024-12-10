@@ -1179,6 +1179,13 @@ Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::accelerator(uint32_t binding
     return *this;
 }
 
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::default_post_process()
+{
+    sampled_image(1, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .sampler(2, VK_SHADER_STAGE_FRAGMENT_BIT);
+    return *this;
+}
+
 VkDescriptorSetLayout Vk_Descriptor_Set_Layout::create(const char* name)
 {
     VkDescriptorSetLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
