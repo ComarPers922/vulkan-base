@@ -43,7 +43,12 @@ static void create_instance(const std::span<const char*>& instance_extensions)
     VkApplicationInfo app_info { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     app_info.apiVersion = VK_API_VERSION_1_3;
 
-    std::vector layers{ "VK_LAYER_KHRONOS_validation" };
+    std::vector <const char*> layers
+	{
+#ifdef _DEBUG
+    	"VK_LAYER_KHRONOS_validation"
+#endif
+    };
 
     VkInstanceCreateInfo instance_create_info{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instance_create_info.pApplicationInfo = &app_info;

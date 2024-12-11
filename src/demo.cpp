@@ -46,6 +46,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     // Specify required features.
     VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
     Vk_PNexer pnexer(features2);
+    features2.features.samplerAnisotropy = VK_TRUE;
     vk_init_params.device_create_info_pnext = (const VkBaseInStructure*)&features2;
 
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{
@@ -134,13 +135,31 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         create_info.mipLodBias = 0.0f;
-        create_info.anisotropyEnable = VK_FALSE;
-        create_info.maxAnisotropy = 1;
+        create_info.anisotropyEnable = VK_TRUE;
+        create_info.maxAnisotropy = 16;
         create_info.minLod = 0.0f;
         create_info.maxLod = 12.0f;
 
-        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &sampler));
-        vk_set_debug_name(sampler, "diffuse_texture_sampler");
+        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &linear_sampler));
+        vk_set_debug_name(linear_sampler, "diffuse_linear_texture_sampler");
+    }
+
+    {
+        VkSamplerCreateInfo create_info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+        create_info.magFilter = VK_FILTER_NEAREST;
+        create_info.minFilter = VK_FILTER_NEAREST;
+        create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.mipLodBias = 0.0f;
+        create_info.anisotropyEnable = VK_TRUE;
+        create_info.maxAnisotropy = 16;
+        create_info.minLod = 0.0f;
+        create_info.maxLod = 12.0f;
+
+        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &nearest_sampler));
+        vk_set_debug_name(nearest_sampler, "diffuse_nearest_texture_sampler");
     }
 
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Matrix4x4)),
@@ -155,6 +174,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     post_process_descriptor_set_layout = Vk_Descriptor_Set_Layout()
         .default_post_process()
 		.sampled_image(3, VK_SHADER_STAGE_FRAGMENT_BIT)
+		.sampler(4, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create("post_process_set_layout");
 
     auto pushConstant = VkPushConstantRange{ };
@@ -284,7 +304,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         {
             VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
             descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-            descriptor_info.data.pSampler = &sampler;
+            descriptor_info.data.pSampler = &linear_sampler;
 
             VkDeviceSize offset;
             vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 2, &offset);
@@ -333,10 +353,21 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         {
             VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
             descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-            descriptor_info.data.pSampler = &sampler;
+            descriptor_info.data.pSampler = &linear_sampler;
 
             VkDeviceSize offset;
             vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 2, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.samplerDescriptorSize,
+                static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
+        }
+
+        {
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+            descriptor_info.data.pSampler = &nearest_sampler;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 4, &offset);
             vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.samplerDescriptorSize,
                 static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
         }
@@ -388,7 +419,8 @@ void Vk_Demo::shutdown() {
     descriptor_buffer.destroy();
     uniform_buffer.destroy();
 
-    vkDestroySampler(vk.device, sampler, nullptr);
+    vkDestroySampler(vk.device, nearest_sampler, nullptr);
+    vkDestroySampler(vk.device, linear_sampler, nullptr);
     vkDestroyDescriptorSetLayout(vk.device, post_process_descriptor_set_layout, nullptr);
     vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, post_process_pipeline_layout, nullptr);
@@ -564,7 +596,7 @@ void Vk_Demo::draw_frame() {
     //vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &quad_mesh.vertex_buffer.handle, &zero_offset);
     //vkCmdBindIndexBuffer(vk.command_buffer, quad_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 
-    auto pushConstants = Post_Process_Push_Constatnts{ enableFXAA, threshold };
+    auto pushConstants = Post_Process_Push_Constatnts{ static_cast<uint32_t>(aliasingOption), threshold, frameIndex };
 
     vkCmdSetDescriptorBufferOffsetsEXT(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_process_pipeline_layout, 0, 1, &buffer_index, &set_offset);
 
@@ -595,6 +627,7 @@ void Vk_Demo::draw_frame() {
     gpu_times.frame->end();
     vk_end_gpu_marker_scope(vk.command_buffer);
     vk_end_frame();
+    frameIndex++;
 }
 
 void Vk_Demo::color_attachment_transition_for_copy_src()
@@ -709,10 +742,26 @@ void Vk_Demo::do_imgui() {
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
             ImGui::Checkbox("Animate", &animate);
-            bool isFXAAEnabled = enableFXAA != 0;
-            ImGui::Checkbox("Enable FXAA", &isFXAAEnabled);
-            enableFXAA = isFXAAEnabled ? 1 : 0;
-            ImGui::SliderFloat("FXAA Threshold", &threshold, 0.01f, 1.f);
+            //bool isFXAAEnabled = aliasingOption != 0;
+            //ImGui::Checkbox("Enable FXAA", &isFXAAEnabled);
+            //aliasingOption = isFXAAEnabled ? 1 : 0;
+
+        	const std::array options = { "None", "FXAA", "TAA" };
+            const int32_t numOptions = options.size();
+
+            ImGui::Combo("Antialiasing", &aliasingOption, options.data(), numOptions);
+            switch (aliasingOption)
+            {
+				case 0: break;
+				case 1:
+                {
+                    ImGui::SliderFloat("FXAA Threshold", &threshold, 0.01f, 1.f);
+                    
+                }
+                break;
+                case 2: break;
+                default: break;
+            }
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;

@@ -48,8 +48,9 @@ private:
     bool show_ui = true;
     bool vsync = true;
     bool animate = false;
-    uint32_t enableFXAA = true;
+    int aliasingOption = true;
     float threshold = 0.1f;
+    uint32_t frameIndex;
 
     Time last_frame_time{};
     double sim_time = 0;
@@ -76,7 +77,8 @@ private:
     Vk_Buffer uniform_buffer;
     void* mapped_uniform_buffer = nullptr;
     Vk_Image texture;
-    VkSampler sampler;
+    VkSampler linear_sampler;
+    VkSampler nearest_sampler;
 
     GPU_MESH gpu_mesh;
     GPU_MESH quad_mesh;

@@ -333,6 +333,7 @@ struct Post_Process_Push_Constatnts
 {
     uint32_t enableFXAA;
     float threshold;
+    uint32_t frameIndex;
 };
 
 #define VK_GPU_MARKER_SCOPE(command_buffer, name) GPU_Marker_Scope gpu_marker_scope##__LINE__(command_buffer, name)

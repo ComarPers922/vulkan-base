@@ -5,27 +5,59 @@ layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 color_attachment0;
 
 layout(binding=1) uniform texture2D input_image;
-layout(binding=2) uniform sampler input_image_sampler;
+layout(binding=2) uniform sampler linear_input_image_sampler;
 layout(binding=3) uniform texture2D prev_frame_image;
+layout(binding=4) uniform sampler nearest_input_image_sampler;
 
-#define texSampler sampler2D(input_image, input_image_sampler)
-#define texSamplerPrev sampler2D(prev_frame_image, input_image_sampler)
+#define texSampler sampler2D(input_image, nearest_input_image_sampler)
+#define texSamplerPrev sampler2D(prev_frame_image, linear_input_image_sampler)
 
 layout( push_constant ) uniform constants
 {
-    int enableFXAA;
+    int aliasingOption;
     float threshold;
+    uint frameIndex;
 } PushConstants;
 
+const vec2 haltonPoints[16] = vec2[16](
+    vec2(0.5, 0.333333),
+    vec2(0.25, 0.666667),
+    vec2(0.75, 0.111111),
+    vec2(0.125, 0.444444),
+    vec2(0.625, 0.777778),
+    vec2(0.375, 0.222222),
+    vec2(0.875, 0.555556),
+    vec2(0.0625, 0.888889),
+    vec2(0.5625, 0.037037),
+    vec2(0.3125, 0.37037),
+    vec2(0.8125, 0.703704),
+    vec2(0.1875, 0.148148),
+    vec2(0.6875, 0.481481),
+    vec2(0.4375, 0.814815),
+    vec2(0.9375, 0.259259),
+    vec2(0.03125, 0.592593)
+);
 
 void main() 
 {
-    if (PushConstants.enableFXAA == 0)
+    if (PushConstants.aliasingOption == 0)
     {
         color_attachment0 = texture(texSampler, frag_uv);
         return;
     }
+
     vec2 texSize = textureSize(texSampler, 0);
+    if (PushConstants.aliasingOption == 2)
+    {
+        vec2 offset = haltonPoints[PushConstants.frameIndex % 16];
+        offset = ((offset - 0.5) / texSize) * 2.;
+        vec4 prevColor = texture(texSamplerPrev, frag_uv);
+        vec4 curColor = texture(texSampler, frag_uv + offset);
+
+        color_attachment0 = mix(curColor, prevColor, 0.9);
+        return;
+    }
+
     vec2 pixelSize = 1.0 / texSize;
 
     // Sample the four neighboring pixels
