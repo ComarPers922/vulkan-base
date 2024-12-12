@@ -64,6 +64,7 @@ private:
     Vk_Image depth_buffer_image;
     Vk_Image post_process_image;
     Vk_Image prev_frame_image;
+    Vk_Image motion_vec_image;
     VkDescriptorSetLayout descriptor_set_layout;
     VkDescriptorSetLayout post_process_descriptor_set_layout;
     VkPipelineLayout pipeline_layout;

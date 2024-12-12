@@ -38,6 +38,21 @@ const vec2 haltonPoints[16] = vec2[16](
     vec2(0.03125, 0.592593)
 );
 
+float halton(int index, int base) {
+    float result = 0.0;
+    float f = 1.0 / float(base);
+    int i = index;
+    while (i > 0) {
+        result += f * float(i % base);
+        i = int(i / base);
+        f /= float(base);
+    }
+    return result;
+}
+vec2 jitterOffset(int frameIndex) {
+    return fract(vec2(halton(frameIndex, 2), halton(frameIndex, 3)) * 2.0 - 1.0);
+}
+
 void main() 
 {
     if (PushConstants.aliasingOption == 0)
@@ -49,7 +64,8 @@ void main()
     vec2 texSize = textureSize(texSampler, 0);
     if (PushConstants.aliasingOption == 2)
     {
-        vec2 offset = haltonPoints[PushConstants.frameIndex % 16];
+        // vec2 offset = haltonPoints[PushConstants.frameIndex % 16];
+        vec2 offset = jitterOffset(int(PushConstants.frameIndex));
         offset = ((offset - 0.5) / texSize) * 2.;
         vec4 prevColor = texture(texSamplerPrev, frag_uv);
         vec4 curColor = texture(texSampler, frag_uv + offset);

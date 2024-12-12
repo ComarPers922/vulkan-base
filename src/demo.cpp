@@ -210,8 +210,17 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         state.vertex_attribute_count = 2;
 
         state.color_attachment_formats[0] = vk.surface_format.format;
-        state.color_attachment_count = 1;
+        state.color_attachment_formats[1] = vk.surface_format.format;
+        state.color_attachment_count = 2;
         state.depth_attachment_format = get_depth_image_format();
+
+        state.attachment_blend_state_count = 2;
+
+        auto& attachment_blend_state = state.attachment_blend_state[1];
+        attachment_blend_state = VkPipelineColorBlendAttachmentState{};
+        attachment_blend_state.blendEnable = VK_FALSE;
+        attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
         pipeline = vk_create_graphics_pipeline(state, vertex_shader.handle, fragment_shader.handle, pipeline_layout, "draw_mesh_pipeline");
     }
@@ -378,6 +387,8 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         ImGui::CreateContext();
         ImGui_ImplGlfw_InitForVulkan(window, true);
 
+        state.color_attachment_count = 1;
+
         ImGui_ImplVulkan_InitInfo init_info{};
         init_info.Instance = vk.instance;
         init_info.PhysicalDevice = vk.physical_device;
@@ -409,6 +420,7 @@ void Vk_Demo::shutdown() {
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    motion_vec_image.destroy();
     prev_frame_image.destroy();
     post_process_image.destroy();
     release_resolution_dependent_resources();
@@ -447,6 +459,9 @@ void Vk_Demo::restore_resolution_dependent_resources() {
 
         prev_frame_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, "prev_frame");
+
+        motion_vec_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, "motion_vec");
     }
     VkDescriptorImageInfo image_info;
     image_info.imageView = post_process_image.view;
@@ -545,6 +560,13 @@ void Vk_Demo::draw_frame() {
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     color_attachment.clearValue.color = { 0.32f, 0.32f, 0.4f, 0.0f };
 
+    VkRenderingAttachmentInfo motion_vec_attachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
+    motion_vec_attachment.imageView = motion_vec_image.view;
+    motion_vec_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    motion_vec_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    motion_vec_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    motion_vec_attachment.clearValue.color = { 0.f, 0.f, 0.f, 0.0f };
+
     VkRenderingAttachmentInfo depth_attachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
     depth_attachment.imageView = depth_buffer_image.view;
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -552,11 +574,13 @@ void Vk_Demo::draw_frame() {
     depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attachment.clearValue.depthStencil = { 1.f, 0 };
 
+    std::array colorAttachments{ color_attachment, motion_vec_attachment };
+
     VkRenderingInfo rendering_info{ VK_STRUCTURE_TYPE_RENDERING_INFO };
     rendering_info.renderArea.extent = vk.surface_size;
     rendering_info.layerCount = 1;
-    rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachments = &color_attachment;
+    rendering_info.colorAttachmentCount = colorAttachments.size();
+    rendering_info.pColorAttachments = colorAttachments.data();
     rendering_info.pDepthAttachment = &depth_attachment;
 
     vkCmdBeginRendering(vk.command_buffer, &rendering_info);
@@ -589,7 +613,10 @@ void Vk_Demo::draw_frame() {
     post_process_descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
     vkCmdBindDescriptorBuffersEXT(vk.command_buffer, 1, &post_process_descriptor_buffer_binding_info);
 
-    vkCmdBeginRendering(vk.command_buffer, &rendering_info);
+	rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+	vkCmdBeginRendering(vk.command_buffer, &rendering_info);
     vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &quad_mesh.vertex_buffer.handle, &zero_offset);
     vkCmdBindIndexBuffer(vk.command_buffer, quad_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 

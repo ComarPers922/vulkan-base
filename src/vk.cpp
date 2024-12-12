@@ -553,7 +553,10 @@ Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageUsageFla
         create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
         create_info.usage = usage_flags;
         create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        create_info.initialLayout =
+            usage_flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT ?
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL :
+            VK_IMAGE_LAYOUT_UNDEFINED;
 
         VmaAllocationCreateInfo alloc_create_info{};
         alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
