@@ -8,9 +8,11 @@ layout(binding=1) uniform texture2D input_image;
 layout(binding=2) uniform sampler linear_input_image_sampler;
 layout(binding=3) uniform texture2D prev_frame_image;
 layout(binding=4) uniform sampler nearest_input_image_sampler;
+layout(binding=5) uniform texture2D motion_vec_image;
 
 #define texSampler sampler2D(input_image, nearest_input_image_sampler)
 #define texSamplerPrev sampler2D(prev_frame_image, linear_input_image_sampler)
+#define texSamplerMotion sampler2D(motion_vec_image, nearest_input_image_sampler)
 
 layout( push_constant ) uniform constants
 {
@@ -67,7 +69,8 @@ void main()
         // vec2 offset = haltonPoints[PushConstants.frameIndex % 16];
         vec2 offset = jitterOffset(int(PushConstants.frameIndex));
         offset = ((offset - 0.5) / texSize) * 2.;
-        vec4 prevColor = texture(texSamplerPrev, frag_uv);
+        vec2 prevOffset = texture(texSamplerMotion, frag_uv).rg * 2. - 1.;
+        vec4 prevColor = texture(texSamplerPrev, frag_uv + prevOffset);
         vec4 curColor = texture(texSampler, frag_uv + offset);
 
         color_attachment0 = mix(curColor, prevColor, 0.9);

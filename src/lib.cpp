@@ -97,6 +97,31 @@ Vector4 Matrix3x4::get_row(int row) const {
     return Vector4(a[row][0], a[row][1], a[row][2], a[row][3]);
 }
 
+Matrix4x4& Matrix4x4::operator=(const Matrix4x4& other)
+{
+    a[0][0] = other.a[0][0];
+    a[0][1] = other.a[0][1];
+    a[0][2] = other.a[0][2];
+    a[0][3] = other.a[0][3];
+
+    a[1][0] = other.a[1][0];
+    a[1][1] = other.a[1][1];
+    a[1][2] = other.a[1][2];
+    a[1][3] = other.a[1][3];
+
+    a[2][0] = other.a[2][0];
+    a[2][1] = other.a[2][1];
+    a[2][2] = other.a[2][2];
+    a[2][3] = other.a[2][3];
+
+    a[3][0] = other.a[3][0];
+    a[3][1] = other.a[3][1];
+    a[3][2] = other.a[3][2];
+    a[3][3] = other.a[3][3];
+
+    return *this;
+}
+
 Matrix3x4 operator*(const Matrix3x4& m1, const Matrix3x4& m2) {
     Matrix3x4 m;
     m.a[0][0] = m1.a[0][0] * m2.a[0][0] + m1.a[0][1] * m2.a[1][0] + m1.a[0][2] * m2.a[2][0];

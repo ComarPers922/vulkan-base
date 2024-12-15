@@ -270,6 +270,8 @@ struct Matrix3x4 {
 struct Matrix4x4 {
     float a[4][4];
     static const Matrix4x4 identity;
+
+    Matrix4x4& operator= (const Matrix4x4& other);
 };
 
 Matrix3x4 operator*(const Matrix3x4& m1, const Matrix3x4& m2);

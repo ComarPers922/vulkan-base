@@ -162,7 +162,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         vk_set_debug_name(nearest_sampler, "diffuse_nearest_texture_sampler");
     }
 
-    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Matrix4x4)),
+    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Main_Frame_Uniform)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "uniform_buffer");
 
     descriptor_set_layout = Vk_Descriptor_Set_Layout()
@@ -174,6 +174,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     post_process_descriptor_set_layout = Vk_Descriptor_Set_Layout()
         .default_post_process()
 		.sampled_image(3, VK_SHADER_STAGE_FRAGMENT_BIT)
+		.sampled_image(5, VK_SHADER_STAGE_FRAGMENT_BIT)
 		.sampler(4, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create("post_process_set_layout");
 
@@ -444,6 +445,7 @@ void Vk_Demo::shutdown() {
 }
 
 void Vk_Demo::release_resolution_dependent_resources() {
+    motion_vec_image.destroy();
     prev_frame_image.destroy();
     post_process_image.destroy();
     depth_buffer_image.destroy();
@@ -483,6 +485,11 @@ void Vk_Demo::restore_resolution_dependent_resources() {
 
     image_info.imageView = prev_frame_image.view;
     vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 3, &offset);
+    vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.sampledImageDescriptorSize,
+        static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
+
+    image_info.imageView = motion_vec_image.view;
+    vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, post_process_descriptor_set_layout, 5, &offset);
     vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.sampledImageDescriptorSize,
         static_cast<uint8_t*>(post_process_mapped_descriptor_buffer_ptr) + offset);
 
@@ -526,10 +533,15 @@ void Vk_Demo::run_frame() {
 	Matrix3x4 view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
     Matrix3x4 model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
     Matrix4x4 model_view_proj = projection_transform * view_transform * model_transform;
-    memcpy(mapped_uniform_buffer, &model_view_proj, sizeof(model_view_proj));
+
+    main_frame_uniform.cur = model_view_proj;
+
+    memcpy(mapped_uniform_buffer, &main_frame_uniform, sizeof(Main_Frame_Uniform));
 
     do_imgui();
     draw_frame();
+
+    main_frame_uniform.prev = main_frame_uniform.cur;
 }
 
 void Vk_Demo::draw_frame() {
@@ -590,6 +602,19 @@ void Vk_Demo::draw_frame() {
     rendering_info.pColorAttachments = colorAttachments.data();
     rendering_info.pDepthAttachment = &depth_attachment;
 
+
+    vk_begin_gpu_marker_scope(vk.command_buffer, "Draw main frame");
+
+    color_attachment_transition_for_copy_src();
+
+    post_process_transition_for_copy_dst(post_process_image.handle);
+
+    vk_cmd_image_barrier(vk.command_buffer, motion_vec_image.handle,
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_ACCESS_2_NONE,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_NONE,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
     vkCmdBeginRendering(vk.command_buffer, &rendering_info);
     const VkDeviceSize zero_offset = 0;
     vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &gpu_mesh.vertex_buffer.handle, &zero_offset);
@@ -603,17 +628,21 @@ void Vk_Demo::draw_frame() {
     vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
 
     vkCmdEndRendering(vk.command_buffer);
+    vk_end_gpu_marker_scope(vk.command_buffer);
 
-    color_attachment_transition_for_copy_src();
-
-    post_process_transition_for_copy_dst(post_process_image.handle);
-
+    vk_begin_gpu_marker_scope(vk.command_buffer, "Begin post processing");
     simple_image_copy(vk.swapchain_info.images[vk.swapchain_image_index],
         post_process_image.handle,
         { vk.surface_size.width, vk.surface_size.height });
 
     post_process_transition_for_rendering(post_process_image.handle);
     color_attachment_transition_for_rendering();
+
+    vk_cmd_image_barrier(vk.command_buffer, motion_vec_image.handle,
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_ACCESS_2_NONE,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_NONE,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     VkDescriptorBufferBindingInfoEXT post_process_descriptor_buffer_binding_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT };
     post_process_descriptor_buffer_binding_info.address = post_process_descriptor_buffer.device_address;
@@ -639,7 +668,9 @@ void Vk_Demo::draw_frame() {
         0, sizeof(Post_Process_Push_Constatnts), &pushConstants);
     vkCmdDrawIndexed(vk.command_buffer, quad_mesh.index_count, 1, 0, 0, 0);
     vkCmdEndRendering(vk.command_buffer);
+    vk_end_gpu_marker_scope(vk.command_buffer);
 
+    vk_begin_gpu_marker_scope(vk.command_buffer, "Save current frame as history frame");
     color_attachment_transition_for_copy_src();
     post_process_transition_for_copy_dst(prev_frame_image.handle);
     simple_image_copy(vk.swapchain_info.images[vk.swapchain_image_index],
@@ -648,13 +679,16 @@ void Vk_Demo::draw_frame() {
     post_process_transition_for_rendering(prev_frame_image.handle);
 
     color_attachment_transition_for_rendering();
+    vk_end_gpu_marker_scope(vk.command_buffer);
 
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 
+    vk_begin_gpu_marker_scope(vk.command_buffer, "Drawing GUI");
     vkCmdBeginRendering(vk.command_buffer, &rendering_info);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRendering(vk.command_buffer);
+    vk_end_gpu_marker_scope(vk.command_buffer);
 
     color_attachment_transition_for_present();
 

@@ -83,4 +83,10 @@ private:
 
     GPU_MESH gpu_mesh;
     GPU_MESH quad_mesh;
+
+    struct Main_Frame_Uniform
+    {
+        Matrix4x4 cur;
+        Matrix4x4 prev;
+    } main_frame_uniform;
 };
