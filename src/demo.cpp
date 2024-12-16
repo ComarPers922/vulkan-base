@@ -282,7 +282,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         {
             VkDescriptorAddressInfoEXT address_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT };
             address_info.address = uniform_buffer.device_address;
-            address_info.range = sizeof(Matrix4x4);
+            address_info.range = sizeof(Main_Frame_Uniform);
 
             VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
             descriptor_info.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

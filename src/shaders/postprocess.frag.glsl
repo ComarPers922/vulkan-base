@@ -52,8 +52,9 @@ float halton(int index, int base) {
     return result;
 }
 vec2 jitterOffset(int frameIndex) {
-    return fract(vec2(halton(frameIndex, 2), halton(frameIndex, 3)) * 2.0 - 1.0);
+    return fract(vec2(halton(frameIndex, 2), halton(frameIndex, 3)) * 5.);
 }
+
 
 void main() 
 {
@@ -64,20 +65,38 @@ void main()
     }
 
     vec2 texSize = textureSize(texSampler, 0);
+    vec2 pixelSize = 1. / texSize;
     if (PushConstants.aliasingOption == 2)
     {
         // vec2 offset = haltonPoints[PushConstants.frameIndex % 16];
         vec2 offset = jitterOffset(int(PushConstants.frameIndex));
         offset = ((offset - 0.5) / texSize) * 2.;
+
         vec2 prevOffset = texture(texSamplerMotion, frag_uv).rg * 2. - 1.;
-        vec4 prevColor = texture(texSamplerPrev, frag_uv + prevOffset);
+        vec4 prevColor = texture(texSamplerPrev, frag_uv - prevOffset);
+
+        float pixelSpeed = clamp(length(prevOffset), 0., 1.);
+        
+        float adaptiveBlend = clamp(1.0 - pixelSpeed * 0.1, 0.1, .9);
+
         vec4 curColor = texture(texSampler, frag_uv + offset);
 
-        color_attachment0 = mix(curColor, prevColor, 0.9);
+        // Apply clamping on the history color.
+        vec3 NearColor0 = texture(texSampler, frag_uv + vec2(1, 0) * pixelSize).rgb;
+        vec3 NearColor1 = texture(texSampler, frag_uv + vec2(0, 1) * pixelSize).rgb;
+        vec3 NearColor2 = texture(texSampler, frag_uv + vec2(-1, 0) * pixelSize).rgb;
+        vec3 NearColor3 = texture(texSampler, frag_uv + vec2(0, -1) * pixelSize).rgb;
+
+        vec3 BoxMin = min(curColor.rgb, min(NearColor0, min(NearColor1, min(NearColor2, NearColor3))));
+        vec3 BoxMax = max(curColor.rgb, max(NearColor0, max(NearColor1, max(NearColor2, NearColor3))));;
+
+        prevColor.rgb = clamp(prevColor.rgb, BoxMin, BoxMax);
+
+        const float blendFactor = 0.9;
+        // color_attachment0 = mix(curColor, prevColor, blendFactor - mix(0., blendFactor, saturate(length(offset)) * 50.));
+        color_attachment0 = mix(curColor, prevColor, blendFactor);
         return;
     }
-
-    vec2 pixelSize = 1.0 / texSize;
 
     // Sample the four neighboring pixels
     vec3 colorCenter = texture(texSampler, frag_uv).rgb;

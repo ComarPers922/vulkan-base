@@ -14,8 +14,9 @@ layout(std140, binding=0) uniform Uniform_Block {
 
 void main() {
     frag_uv = in_uv;
-    history_clipPos = history_model_view_proj * in_position;
-    // history_clipPos = mat4x4(1.) * in_position;
     gl_Position = model_view_proj * in_position;
+
+    // history_clipPos = history_model_view_proj * in_position;
+    history_clipPos = gl_Position;
     clipPos = gl_Position;
 }

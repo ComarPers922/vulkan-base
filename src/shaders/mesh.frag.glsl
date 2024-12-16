@@ -14,13 +14,10 @@ layout(binding=2) uniform sampler image_sampler;
 void main() {
     color_attachment0 = texture(sampler2D(image, image_sampler), frag_uv);
 
-    // vec2 offset = clipPos.xy / clipPos.w - history_clipPos.xy / history_clipPos.w;
-    // vec2 offset = clipPos.xy / clipPos.w;
-    vec2 offset = history_clipPos.xy;// / history_clipPos.w;
-    offset = (offset + 1.) * 0.5;
-        
-    // (clipPos.xy / clipPos.w + 1.) * 0.5 - (history_clipPos.xy / history_clipPos.w + 1.) * 0.5;
+    vec4 convertedClipPos = (clipPos / clipPos.w + 1.) * 0.5;
+    vec4 convertedHistoryPos = (history_clipPos  / history_clipPos.w + 1.) * 0.5;
 
-    motion_vec_attachment = vec4(offset, vec2(0.));
-    motion_vec_attachment = (history_clipPos + 1.) * 0.5;
+    vec2 offset = convertedClipPos.xy - convertedHistoryPos.xy;
+        
+    motion_vec_attachment = vec4(offset, vec2(1.));
 }
