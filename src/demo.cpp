@@ -94,7 +94,8 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     // Geometry buffers.
     {
         // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
-        Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
+        // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
+        Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mine_craft_castle.obj"), 1.f);
         {
             const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
             VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -125,7 +126,8 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     // Texture.
     {
         // texture = vk_load_texture(get_resource_path("model/diffuse.jpg"));
-        texture = vk_load_texture(get_resource_path("model/baloo_diff.png"));
+        // texture = vk_load_texture(get_resource_path("model/baloo_diff.png"));
+        texture = vk_load_texture(get_resource_path("model/mine_craft_castle.jpg"));
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
@@ -520,10 +522,15 @@ void Vk_Demo::restore_resolution_dependent_resources() {
     last_frame_time = Clock::now();
 }
 
+void Vk_Demo::update_scale_by_delta(const float& delta)
+{
+    scale = std::clamp(scale + delta * scroll_sensitivity * static_cast<float>(time_delta), 0.1f, 5.f);
+}
+
 void Vk_Demo::run_frame() {
     Time current_time = Clock::now();
+    time_delta = std::chrono::duration_cast<std::chrono::microseconds>(current_time - last_frame_time).count() / 1e6;
     if (animate) {
-        double time_delta = std::chrono::duration_cast<std::chrono::microseconds>(current_time - last_frame_time).count() / 1e6;
         sim_time += time_delta;
     }
     last_frame_time = current_time;
@@ -531,7 +538,7 @@ void Vk_Demo::run_frame() {
 	float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
 	Matrix4x4 projection_transform = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
 	Matrix3x4 view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
-    Matrix3x4 model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
+    Matrix3x4 model_transform = rotate_y(Matrix3x4::identity * scale, (float)sim_time * radians(20.0f));
     Matrix4x4 model_view_proj = projection_transform * view_transform * model_transform;
 
     main_frame_uniform.cur = model_view_proj;
@@ -681,6 +688,41 @@ void Vk_Demo::draw_frame() {
     color_attachment_transition_for_rendering();
     vk_end_gpu_marker_scope(vk.command_buffer);
 
+    //vk_begin_gpu_marker_scope(vk.command_buffer, "Begin sharpening post processing");
+    //simple_image_copy(vk.swapchain_info.images[vk.swapchain_image_index],
+    //    post_process_image.handle,
+    //    { vk.surface_size.width, vk.surface_size.height });
+
+    //post_process_transition_for_rendering(post_process_image.handle);
+    //color_attachment_transition_for_rendering();
+
+    //vk_cmd_image_barrier(vk.command_buffer, motion_vec_image.handle,
+    //    VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_ACCESS_2_NONE,
+    //    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    //    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_NONE,
+    //    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    //rendering_info.colorAttachmentCount = 1;
+    //rendering_info.pColorAttachments = &color_attachment;
+
+    //vkCmdBeginRendering(vk.command_buffer, &rendering_info);
+    //vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &quad_mesh.vertex_buffer.handle, &zero_offset);
+    //vkCmdBindIndexBuffer(vk.command_buffer, quad_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+
+    ////vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &quad_mesh.vertex_buffer.handle, &zero_offset);
+    ////vkCmdBindIndexBuffer(vk.command_buffer, quad_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+
+    //auto sharpening = Post_Process_Push_Constatnts{ pushConstants.AAType == 2 ? 4u : 0u, threshold, frameIndex };
+
+    //vkCmdSetDescriptorBufferOffsetsEXT(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_process_pipeline_layout, 0, 1, &buffer_index, &set_offset);
+
+    //vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_process_pipeline);
+    //vkCmdPushConstants(vk.command_buffer, post_process_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+    //    0, sizeof(Post_Process_Push_Constatnts), &sharpening);
+    //vkCmdDrawIndexed(vk.command_buffer, quad_mesh.index_count, 1, 0, 0, 0);
+    //vkCmdEndRendering(vk.command_buffer);
+    //vk_end_gpu_marker_scope(vk.command_buffer);
+
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 
@@ -809,6 +851,7 @@ void Vk_Demo::do_imgui() {
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
+            ImGui::SliderFloat("Scroll Sensitivity", &scroll_sensitivity, 0.1f, 10.f);
             ImGui::Checkbox("Animate", &animate);
             //bool isFXAAEnabled = aliasingOption != 0;
             //ImGui::Checkbox("Enable FXAA", &isFXAAEnabled);

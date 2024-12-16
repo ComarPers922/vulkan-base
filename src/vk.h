@@ -331,7 +331,7 @@ private:
 
 struct Post_Process_Push_Constatnts
 {
-    uint32_t enableFXAA;
+    uint32_t AAType;
     float threshold;
     uint32_t frameIndex;
 };

@@ -27,6 +27,7 @@ public:
     void shutdown();
     void release_resolution_dependent_resources();
     void restore_resolution_dependent_resources();
+    void update_scale_by_delta(const float& delta);
     bool vsync_enabled() const { return vsync; }
     void run_frame();
 
@@ -48,9 +49,13 @@ private:
     bool show_ui = true;
     bool vsync = true;
     bool animate = false;
-    int aliasingOption = true;
+    int aliasingOption = 1;
     float threshold = 0.1f;
+    float scale = 1.f;
     uint32_t frameIndex;
+
+    double time_delta;
+    float scroll_sensitivity = 3.0;
 
     Time last_frame_time{};
     double sim_time = 0;

@@ -57,6 +57,16 @@ static void glfw_key_callback(GLFWwindow* window, int key, int scancode, int act
     }
 }
 
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    auto* demo = static_cast<Vk_Demo*>(glfwGetWindowUserPointer(window));
+    if (!demo)
+    {
+        return;
+    }
+    demo->update_scale_by_delta(static_cast<float>(yoffset));
+}
+
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW error: %s\n", description);
 }
@@ -74,9 +84,12 @@ int main(int argc, char** argv) {
     GLFWwindow* glfw_window = glfwCreateWindow(window_width, window_height, "Vulkan demo", nullptr, nullptr);
     assert(glfw_window != nullptr);
     glfwSetKeyCallback(glfw_window, glfw_key_callback);
+    glfwSetScrollCallback(glfw_window, scroll_callback);
 
     Vk_Demo demo{};
     demo.initialize(glfw_window);
+
+    glfwSetWindowUserPointer(glfw_window, &demo);
 
     bool prev_vsync = demo.vsync_enabled();
 

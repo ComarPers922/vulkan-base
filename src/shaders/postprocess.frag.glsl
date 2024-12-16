@@ -55,6 +55,68 @@ vec2 jitterOffset(int frameIndex) {
     return fract(vec2(halton(frameIndex, 2), halton(frameIndex, 3)) * 5.);
 }
 
+// Sobel operator kernels for edge detection
+const mat3 sobelX = mat3(
+    -1.0, 0.0, 1.0,
+    -2.0, 0.0, 2.0,
+    -1.0, 0.0, 1.0
+);
+
+const mat3 sobelY = mat3(
+    -1.0, -2.0, -1.0,
+    0.0, 0.0, 0.0,
+    1.0, 2.0, 1.0
+);
+
+vec4 sharpenImage(texture2D image, sampler textureSampler, vec2 fragTexCoord)
+{
+    // // Get the texel size of the image (assuming texture is bound to sampler2D)
+    vec2 texelSize = 1.0 / vec2(textureSize(sampler2D(image, textureSampler), 0));
+    // float dx = texelSize.x, dy = texelSize.y;
+
+    // float sumStrength = 1.2;
+
+    // vec4 sum = vec4(0.0);
+    // sum += -1. * texture(sampler2D(image, textureSampler), fragTexCoord + vec2( -1.0 * dx , 0.0 * dy)) * sumStrength;
+    // sum += -1. * texture(sampler2D(image, textureSampler), fragTexCoord + vec2( 0.0 * dx , -1.0 * dy))* sumStrength;
+    // sum += 5. * texture(sampler2D(image, textureSampler), fragTexCoord + vec2( 0.0 * dx , 0.0 * dy)) * sumStrength;
+    // sum += -1. * texture(sampler2D(image, textureSampler), fragTexCoord + vec2( 0.0 * dx , 1.0 * dy)) * sumStrength;
+    // sum += -1. * texture(sampler2D(image, textureSampler), fragTexCoord + vec2( 1.0 * dx , 0.0 * dy)) * sumStrength;
+    // return sum;
+
+    // Fetch the 3x3 neighborhood of the current fragment
+    vec3 sampleTL = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2(-1.0,  1.0)).rgb;
+    vec3 sampleT  = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2( 0.0,  1.0)).rgb;
+    vec3 sampleTR = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2( 1.0,  1.0)).rgb;
+    
+    vec3 sampleL  = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2(-1.0,  0.0)).rgb;
+    vec3 sampleC  = texture(sampler2D(image, textureSampler), fragTexCoord).rgb;  // Current center sample
+    vec3 sampleR  = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2( 1.0,  0.0)).rgb;
+    
+    vec3 sampleBL = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2(-1.0, -1.0)).rgb;
+    vec3 sampleB  = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2( 0.0, -1.0)).rgb;
+    vec3 sampleBR = texture(sampler2D(image, textureSampler), fragTexCoord + texelSize * vec2( 1.0, -1.0)).rgb;
+
+    // Apply Sobel filters in both X and Y directions
+    vec3 gradX = 
+        sobelX[0][0] * sampleTL + sobelX[0][1] * sampleT + sobelX[0][2] * sampleTR +
+        sobelX[1][0] * sampleL + sobelX[1][1] * sampleC + sobelX[1][2] * sampleR +
+        sobelX[2][0] * sampleBL + sobelX[2][1] * sampleB + sobelX[2][2] * sampleBR;
+
+    vec3 gradY =
+        sobelY[0][0] * sampleTL + sobelY[0][1] * sampleT + sobelY[0][2] * sampleTR +
+        sobelY[1][0] * sampleL + sobelY[1][1] * sampleC + sobelY[1][2] * sampleR +
+        sobelY[2][0] * sampleBL + sobelY[2][1] * sampleB + sobelY[2][2] * sampleBR;
+
+    // Combine the gradients
+    float edgeStrength = length(gradX) + length(gradY);
+
+    // Sharpen the image: original color + edge detection result
+    float sharpenFactor = 0.05; // Adjust this to control the sharpening strength
+    vec3 sharpenedColor = sampleC + edgeStrength * sharpenFactor;
+
+    return vec4(sharpenedColor, 1.0);
+}
 
 void main() 
 {
@@ -98,6 +160,11 @@ void main()
         return;
     }
 
+    if (PushConstants.aliasingOption == 4)
+    {
+        color_attachment0 = sharpenImage(input_image, nearest_input_image_sampler, frag_uv);
+        return;
+    }
     // Sample the four neighboring pixels
     vec3 colorCenter = texture(texSampler, frag_uv).rgb;
     vec3 colorLeft   = texture(texSampler, frag_uv + vec2(-pixelSize.x, 0.0)).rgb;

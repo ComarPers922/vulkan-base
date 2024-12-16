@@ -141,6 +141,26 @@ Matrix3x4 operator*(const Matrix3x4& m1, const Matrix3x4& m2) {
     return m;
 }
 
+Matrix3x4 Matrix3x4::operator*(const float& num) const
+{
+    Matrix3x4 m;
+    m.a[0][0] = a[0][0] * num;
+    m.a[0][1] = a[0][1] * num;
+    m.a[0][2] = a[0][2] * num;
+    m.a[0][3] = a[0][3] * num;
+
+    m.a[1][0] = a[1][0] * num;
+    m.a[1][1] = a[1][1] * num;
+    m.a[1][2] = a[1][2] * num;
+    m.a[1][3] = a[1][3] * num;
+
+    m.a[2][0] = a[2][0] * num;
+    m.a[2][1] = a[2][1] * num;
+    m.a[2][2] = a[2][2] * num;
+    m.a[2][3] = a[2][3] * num;
+    return m;
+}
+
 Matrix4x4 operator*(const Matrix4x4& m1, const Matrix3x4& m2) {
     Matrix4x4 m;
     m.a[0][0] = m1.a[0][0] * m2.a[0][0] + m1.a[0][1] * m2.a[1][0] + m1.a[0][2] * m2.a[2][0];
