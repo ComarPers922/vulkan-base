@@ -38,6 +38,8 @@ private:
 
     Vk_Image depth_buffer_image;
     VkDescriptorSetLayout descriptor_set_layout;
+    VkDescriptorSetLayout secondary_descriptor_set_layout;
+    VkDescriptorSetLayout post_process_descriptor_set_layout;
     VkPipelineLayout pipeline_layout;
     VkPipeline pipeline;
     Vk_Buffer descriptor_buffer;
@@ -45,7 +47,12 @@ private:
     Vk_Buffer uniform_buffer;
     void* mapped_uniform_buffer = nullptr;
     Vk_Image texture;
-    VkSampler sampler;
+    Vk_Image secondaryTexture;
+    VkSampler linear_sampler;
+    VkSampler nearest_sampler;
+
+    GPU_MESH gpu_mesh;
+    GPU_MESH quad_mesh;
 
     struct {
         Vk_Buffer vertex_buffer;

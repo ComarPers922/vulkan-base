@@ -268,7 +268,8 @@ struct Vk_Descriptor_Set_Layout {
     Vk_Descriptor_Set_Layout& storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
     Vk_Descriptor_Set_Layout& storage_buffer_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
     Vk_Descriptor_Set_Layout& accelerator(uint32_t binding, VkShaderStageFlags stage_flags);
-    VkDescriptorSetLayout create(const char* name);
+    Vk_Descriptor_Set_Layout& default_post_process();
+    VkDescriptorSetLayout create(const char* name, bool isPushDescriptor = false);
 };
 
 //

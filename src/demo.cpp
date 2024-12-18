@@ -37,6 +37,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     std::array device_extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
     };
     vk_init_params.instance_extensions = std::span{ instance_extensions };
     vk_init_params.device_extensions = std::span{ device_extensions };
@@ -122,8 +123,49 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         create_info.minLod = 0.0f;
         create_info.maxLod = 12.0f;
 
-        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &sampler));
-        vk_set_debug_name(sampler, "diffuse_texture_sampler");
+        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &linear_sampler));
+        vk_set_debug_name(linear_sampler, "diffuse_linear_texture_sampler");
+    }
+
+    // 2ndary Texture.
+    {
+        // texture = vk_load_texture(get_resource_path("model/diffuse.jpg"));
+        secondaryTexture = vk_load_texture(get_resource_path("model/baloo_diff.png"));
+        // texture = vk_load_texture(get_resource_path("model/mine_craft_castle.jpg"));
+
+        //VkSamplerCreateInfo create_info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+        //create_info.magFilter = VK_FILTER_LINEAR;
+        //create_info.minFilter = VK_FILTER_LINEAR;
+        //create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        //create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        //create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        //create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        //create_info.mipLodBias = 0.0f;
+        //create_info.anisotropyEnable = VK_TRUE;
+        //create_info.maxAnisotropy = 16;
+        //create_info.minLod = 0.0f;
+        //create_info.maxLod = 12.0f;
+
+        //VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &linear_sampler));
+        //vk_set_debug_name(linear_sampler, "diffuse_linear_texture_sampler");
+    }
+
+    {
+        VkSamplerCreateInfo create_info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+        create_info.magFilter = VK_FILTER_NEAREST;
+        create_info.minFilter = VK_FILTER_NEAREST;
+        create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.mipLodBias = 0.0f;
+        create_info.anisotropyEnable = VK_TRUE;
+        create_info.maxAnisotropy = 16;
+        create_info.minLod = 0.0f;
+        create_info.maxLod = 12.0f;
+
+        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &nearest_sampler));
+        vk_set_debug_name(nearest_sampler, "diffuse_nearest_texture_sampler");
     }
 
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Matrix4x4)),
@@ -135,8 +177,24 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         .sampler(2, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create("set_layout");
 
-    pipeline_layout = vk_create_pipeline_layout({ descriptor_set_layout }, {}, "pipeline_layout");
+    secondary_descriptor_set_layout = Vk_Descriptor_Set_Layout()
+        .sampled_image(0, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .create("2ndary set layout", true);
 
+    post_process_descriptor_set_layout = Vk_Descriptor_Set_Layout()
+        .default_post_process()
+		.sampled_image(3, VK_SHADER_STAGE_FRAGMENT_BIT)
+		.sampled_image(5, VK_SHADER_STAGE_FRAGMENT_BIT)
+		.sampler(4, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .create("post_process_set_layout");
+
+    auto pushConstant = VkPushConstantRange{ };
+    pushConstant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(Post_Process_Push_Constatnts);
+
+    pipeline_layout = vk_create_pipeline_layout({ descriptor_set_layout, secondary_descriptor_set_layout }, {}, "pipeline_layout");
+    post_process_pipeline_layout = vk_create_pipeline_layout({ post_process_descriptor_set_layout }, { pushConstant }, "post_process_pipeline_layout");
     // Pipeline.
     Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
     {
@@ -170,7 +228,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     }
 
     // Descriptor buffer.
-    {
+    { 
         VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT };
         VkPhysicalDeviceProperties2 physical_device_properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
         physical_device_properties.pNext = &descriptor_buffer_properties;
@@ -269,11 +327,15 @@ void Vk_Demo::shutdown() {
     ImGui::DestroyContext();
     release_resolution_dependent_resources();
     gpu_mesh.destroy();
+    secondaryTexture.destroy();
     texture.destroy();
     descriptor_buffer.destroy();
     uniform_buffer.destroy();
 
-    vkDestroySampler(vk.device, sampler, nullptr);
+    vkDestroySampler(vk.device, nearest_sampler, nullptr);
+    vkDestroySampler(vk.device, linear_sampler, nullptr);
+    vkDestroyDescriptorSetLayout(vk.device, post_process_descriptor_set_layout, nullptr);
+    vkDestroyDescriptorSetLayout(vk.device, secondary_descriptor_set_layout, nullptr);
     vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, pipeline, nullptr);
@@ -379,7 +441,21 @@ void Vk_Demo::draw_frame() {
     vkCmdSetDescriptorBufferOffsetsEXT(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &buffer_index, &set_offset);
 
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
+
+    auto imageInfo = VkDescriptorImageInfo{VK_NULL_HANDLE, secondaryTexture.view,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+
+    auto write = VkWriteDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    write.descriptorCount = 1;
+    write.dstBinding = 0;
+    write.pImageInfo = &imageInfo;
+    write.dstSet = VK_NULL_HANDLE;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+
+    vkCmdPushDescriptorSetKHR(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline_layout, 1, 1, &write);
+
+	vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
 
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRendering(vk.command_buffer);
