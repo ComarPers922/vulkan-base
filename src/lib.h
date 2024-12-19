@@ -68,6 +68,8 @@ inline T round_up(T k, T alignment) {
 struct Vector4;
 
 struct Vector3 {
+    static const Vector3 ZERO;
+
     float x, y, z;
 
     Vector3()

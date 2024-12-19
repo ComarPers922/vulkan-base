@@ -90,7 +90,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
             VK_VERSION_PATCH(physical_device_properties.properties.apiVersion)
         );
     }
-
+    auto& gpu_mesh = *mainModel.GetRenderable()->GetGPUMesh();
     // Geometry buffers.
     {
         // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
@@ -164,7 +164,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         vk_set_debug_name(nearest_sampler, "diffuse_nearest_texture_sampler");
     }
 
-    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Main_Frame_Uniform)),
+    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(TAATransform)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "uniform_buffer");
 
     descriptor_set_layout = Vk_Descriptor_Set_Layout()
@@ -284,7 +284,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         {
             VkDescriptorAddressInfoEXT address_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT };
             address_info.address = uniform_buffer.device_address;
-            address_info.range = sizeof(Main_Frame_Uniform);
+            address_info.range = sizeof(TAATransform);
 
             VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
             descriptor_info.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -428,7 +428,7 @@ void Vk_Demo::shutdown() {
     post_process_image.destroy();
     release_resolution_dependent_resources();
     quad_mesh.destroy();
-    gpu_mesh.destroy();
+    mainModel.destroy();
     texture.destroy();
     post_process_descriptor_buffer.destroy();
     descriptor_buffer.destroy();
@@ -543,7 +543,7 @@ void Vk_Demo::run_frame() {
 
     main_frame_uniform.cur = model_view_proj;
 
-    memcpy(mapped_uniform_buffer, &main_frame_uniform, sizeof(Main_Frame_Uniform));
+    memcpy(mapped_uniform_buffer, &main_frame_uniform, sizeof(TAATransform));
 
     do_imgui();
     draw_frame();
@@ -612,7 +612,9 @@ void Vk_Demo::draw_frame() {
 
     vk_begin_gpu_marker_scope(vk.command_buffer, "Draw main frame");
 
-    color_attachment_transition_for_copy_src();
+    // auto& gpu_mesh = *mainModel.GetRenderable()->GetGPUMesh();
+
+	color_attachment_transition_for_copy_src();
 
     post_process_transition_for_copy_dst(post_process_image.handle);
 
@@ -624,15 +626,17 @@ void Vk_Demo::draw_frame() {
 
     vkCmdBeginRendering(vk.command_buffer, &rendering_info);
     const VkDeviceSize zero_offset = 0;
-    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &gpu_mesh.vertex_buffer.handle, &zero_offset);
-    vkCmdBindIndexBuffer(vk.command_buffer, gpu_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 
     const uint32_t buffer_index = 0;
     const VkDeviceSize set_offset = 0;
     vkCmdSetDescriptorBufferOffsetsEXT(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &buffer_index, &set_offset);
-
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
+
+    //vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &gpu_mesh.vertex_buffer.handle, &zero_offset);
+    //vkCmdBindIndexBuffer(vk.command_buffer, gpu_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+    //vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
+
+    mainModel.GetRenderable()->Draw(vk.command_buffer);
 
     vkCmdEndRendering(vk.command_buffer);
     vk_end_gpu_marker_scope(vk.command_buffer);

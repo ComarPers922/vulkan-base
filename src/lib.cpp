@@ -401,3 +401,5 @@ Triangle_Mesh load_obj_model(const std::string& path, float additional_scale) {
     }
     return mesh;
 }
+
+const Vector3 Vector3::ZERO = Vector3(0, 0, 0);

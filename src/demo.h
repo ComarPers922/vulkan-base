@@ -2,24 +2,12 @@
 
 #include "lib.h"
 #include "vk.h"
+#include "Mesh.h"
 #include <chrono>
 
-struct GLFWwindow;
+#include "GameObject.h"
 
-struct GPU_MESH
-{
-    Vk_Buffer vertex_buffer;
-    Vk_Buffer index_buffer;
-    uint32_t vertex_count = 0;
-    uint32_t index_count = 0;
-    void destroy()
-	{
-        vertex_buffer.destroy();
-        index_buffer.destroy();
-        vertex_count = 0;
-        index_count = 0;
-    }
-};
+struct GLFWwindow;
 
 class Vk_Demo {
 public:
@@ -86,12 +74,9 @@ private:
     VkSampler linear_sampler;
     VkSampler nearest_sampler;
 
-    GPU_MESH gpu_mesh;
+    // GPU_MESH gpu_mesh;
+    GameObject mainModel;
     GPU_MESH quad_mesh;
 
-    struct Main_Frame_Uniform
-    {
-        Matrix4x4 cur;
-        Matrix4x4 prev;
-    } main_frame_uniform;
+    TAATransform main_frame_uniform;
 };

@@ -10,6 +10,16 @@ set(PROGRAM_SOURCE
     src/vk.cpp
     src/vk.h
     src/Constants.h
+    src/BaseObject.h
+    src/BaseObject.cpp
+    src/BaseComponent.h
+    src/BaseComponent.cpp
+    src/RenderableComponent.h
+    src/RenderableComponent.cpp
+    src/Mesh.h
+    src/Mesh.cpp
+    src/GameObject.h
+    src/GameObject.cpp
 )
 set(SHADER_SOURCE
     src/shaders/mesh.vert.glsl
