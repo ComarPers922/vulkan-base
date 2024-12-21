@@ -16,13 +16,21 @@ public:
         return mMesh;
     }
 
+    std::unique_ptr<Vk_Image>& GetTexture()
+    {
+        return mTexture;
+    }
+
     Transform Transform;
 
-    virtual void destroy() override;
+    virtual void Destroy() override;
 
     virtual void Draw(VkCommandBuffer cmdBuf);
 
+    DEFAULT_DESTRUCTOR_COMPONENT(RenderableComponent)
+
 private:
     std::unique_ptr<GPU_MESH> mMesh;
+    std::unique_ptr<Vk_Image> mTexture;
 };
 

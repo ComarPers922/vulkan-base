@@ -2,7 +2,7 @@
 
 #include "BaseComponent.h"
 
-void BaseObject::destroy()
+void BaseObject::Destroy()
 {
 	if (components.empty())
 	{
@@ -11,8 +11,11 @@ void BaseObject::destroy()
 
 	for (auto& item : components)
 	{
-		item->destroy();
+		item->Destroy();
 	}
 
 	components.clear();
+
+	isDestroyed = true;
 }
+

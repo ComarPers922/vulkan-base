@@ -2,13 +2,15 @@
 #include "demo.h"
 
 RenderableComponent::RenderableComponent():
-	mMesh(std::make_unique<GPU_MESH>())
+	mMesh(std::make_unique<GPU_MESH>()),
+	mTexture(std::make_unique<Vk_Image>())
 {
 	
 }
 
-void RenderableComponent::destroy()
+void RenderableComponent::Destroy()
 {
+	BaseComponent::Destroy();
 	mMesh->destroy();
 }
 

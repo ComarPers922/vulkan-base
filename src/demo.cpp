@@ -428,7 +428,7 @@ void Vk_Demo::shutdown() {
     post_process_image.destroy();
     release_resolution_dependent_resources();
     quad_mesh.destroy();
-    mainModel.destroy();
+    mainModel.Destroy();
     texture.destroy();
     post_process_descriptor_buffer.destroy();
     descriptor_buffer.destroy();
@@ -605,7 +605,7 @@ void Vk_Demo::draw_frame() {
     VkRenderingInfo rendering_info{ VK_STRUCTURE_TYPE_RENDERING_INFO };
     rendering_info.renderArea.extent = vk.surface_size;
     rendering_info.layerCount = 1;
-    rendering_info.colorAttachmentCount = colorAttachments.size();
+    rendering_info.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
     rendering_info.pColorAttachments = colorAttachments.data();
     rendering_info.pDepthAttachment = &depth_attachment;
 
@@ -862,7 +862,7 @@ void Vk_Demo::do_imgui() {
             //aliasingOption = isFXAAEnabled ? 1 : 0;
 
         	const std::array options = { "None", "FXAA", "TAA" };
-            const int32_t numOptions = options.size();
+            const int32_t numOptions = static_cast<uint32_t>(options.size());
 
             ImGui::Combo("Antialiasing", &aliasingOption, options.data(), numOptions);
             switch (aliasingOption)
