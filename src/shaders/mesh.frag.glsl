@@ -11,8 +11,10 @@ layout(location = 1) out vec4 motion_vec_attachment;
 layout(binding=1) uniform texture2D image;
 layout(binding=2) uniform sampler image_sampler;
 
+layout(set=1, binding=0) uniform texture2D mainTex;
+
 void main() {
-    color_attachment0 = texture(sampler2D(image, image_sampler), frag_uv);
+    color_attachment0 = texture(sampler2D(mainTex, image_sampler), frag_uv);
 
     vec4 convertedClipPos = (clipPos / clipPos.w + 1.) * 0.5;
     vec4 convertedHistoryPos = (history_clipPos  / history_clipPos.w + 1.) * 0.5;

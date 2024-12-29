@@ -27,10 +27,12 @@ public:
 
     virtual void Draw(VkCommandBuffer cmdBuf);
 
+    virtual void BindTextureToPipeline(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline);
+
     DEFAULT_DESTRUCTOR_COMPONENT(RenderableComponent)
 
 private:
     std::unique_ptr<GPU_MESH> mMesh;
-    std::unique_ptr<Vk_Image> mTexture;
+    std::unique_ptr<Vk_Image> mTexture = nullptr;
 };
 

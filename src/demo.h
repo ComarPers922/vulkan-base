@@ -59,6 +59,7 @@ private:
     Vk_Image prev_frame_image;
     Vk_Image motion_vec_image;
     VkDescriptorSetLayout descriptor_set_layout;
+    VkDescriptorSetLayout main_texture_descriptor_set_layout;
     VkDescriptorSetLayout post_process_descriptor_set_layout;
     VkPipelineLayout pipeline_layout;
     VkPipelineLayout post_process_pipeline_layout;
@@ -71,6 +72,7 @@ private:
     Vk_Buffer uniform_buffer;
     void* mapped_uniform_buffer = nullptr;
     Vk_Image texture;
+    // Vk_Image secondaryTexture;
     VkSampler linear_sampler;
     VkSampler nearest_sampler;
 

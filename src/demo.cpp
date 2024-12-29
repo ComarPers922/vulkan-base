@@ -39,6 +39,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     std::array device_extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
     };
     vk_init_params.instance_extensions = std::span{ instance_extensions };
     vk_init_params.device_extensions = std::span{ device_extensions };
@@ -129,6 +130,10 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         // texture = vk_load_texture(get_resource_path("model/baloo_diff.png"));
         texture = vk_load_texture(get_resource_path("model/mine_craft_castle.jpg"));
 
+        auto& modelTexture = mainModel.GetRenderable()->GetTexture();
+        auto tempImage = vk_load_texture(get_resource_path("model/mine_craft_castle.jpg"));
+        modelTexture = std::make_unique<Vk_Image>(std::move(tempImage));
+
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
         create_info.minFilter = VK_FILTER_LINEAR;
@@ -173,6 +178,10 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         .sampler(2, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create("set_layout");
 
+    main_texture_descriptor_set_layout = Vk_Descriptor_Set_Layout()
+        .sampled_image(0, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .create("main_texture_set_layout", true);
+
     post_process_descriptor_set_layout = Vk_Descriptor_Set_Layout()
         .default_post_process()
 		.sampled_image(3, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -185,7 +194,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     pushConstant.offset = 0;
     pushConstant.size = sizeof(Post_Process_Push_Constatnts);
 
-    pipeline_layout = vk_create_pipeline_layout({ descriptor_set_layout }, {}, "pipeline_layout");
+    pipeline_layout = vk_create_pipeline_layout({ descriptor_set_layout, main_texture_descriptor_set_layout }, {}, "pipeline_layout");
     post_process_pipeline_layout = vk_create_pipeline_layout({ post_process_descriptor_set_layout }, { pushConstant }, "post_process_pipeline_layout");
     // Pipeline.
     Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
@@ -428,7 +437,9 @@ void Vk_Demo::shutdown() {
     post_process_image.destroy();
     release_resolution_dependent_resources();
     quad_mesh.destroy();
+    // mainModel.GetRenderable()->GetTexture()->destroy();
     mainModel.Destroy();
+    // secondaryTexture.destroy();
     texture.destroy();
     post_process_descriptor_buffer.destroy();
     descriptor_buffer.destroy();
@@ -437,7 +448,8 @@ void Vk_Demo::shutdown() {
     vkDestroySampler(vk.device, nearest_sampler, nullptr);
     vkDestroySampler(vk.device, linear_sampler, nullptr);
     vkDestroyDescriptorSetLayout(vk.device, post_process_descriptor_set_layout, nullptr);
-    vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
+    vkDestroyDescriptorSetLayout(vk.device, main_texture_descriptor_set_layout, nullptr);
+	vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, post_process_pipeline_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, post_process_pipeline, nullptr);
@@ -636,7 +648,27 @@ void Vk_Demo::draw_frame() {
     //vkCmdBindIndexBuffer(vk.command_buffer, gpu_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
     //vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
 
-    mainModel.GetRenderable()->Draw(vk.command_buffer);
+    //auto imageInfo = VkDescriptorImageInfo{ VK_NULL_HANDLE,
+    //    mainModel.GetRenderable()->GetTexture()->view,
+    //    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    //auto write = VkWriteDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+
+    //write.descriptorCount = 1;
+    //write.dstBinding = 0;
+    //write.pImageInfo = &imageInfo;
+    //write.dstSet = VK_NULL_HANDLE;
+    //write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+
+    //vkCmdPushDescriptorSetKHR(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    //    pipeline_layout, 1, 1, &write);
+
+    auto renderable = mainModel.GetRenderable();
+    if (renderable)
+    {
+        renderable->BindTextureToPipeline(vk.command_buffer, pipeline_layout);
+        renderable->Draw(vk.command_buffer);
+    }
+
 
     vkCmdEndRendering(vk.command_buffer);
     vk_end_gpu_marker_scope(vk.command_buffer);

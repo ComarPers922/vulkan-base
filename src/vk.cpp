@@ -1191,12 +1191,17 @@ Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::default_post_process()
     return *this;
 }
 
-VkDescriptorSetLayout Vk_Descriptor_Set_Layout::create(const char* name)
+VkDescriptorSetLayout Vk_Descriptor_Set_Layout::create(const char* name, bool isPushDescriptor)
 {
     VkDescriptorSetLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
     create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
     create_info.bindingCount = binding_count;
     create_info.pBindings = bindings.data();
+
+    if (isPushDescriptor)
+    {
+        create_info.flags |= VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+    }
 
     VkDescriptorSetLayout set_layout;
     VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &set_layout));
