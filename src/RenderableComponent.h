@@ -29,6 +29,8 @@ public:
 
     virtual void BindTextureToPipeline(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline);
 
+    virtual void DrawWithTextures(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline);
+
     DEFAULT_DESTRUCTOR_COMPONENT(RenderableComponent)
 
 private:

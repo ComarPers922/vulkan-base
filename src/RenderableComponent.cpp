@@ -48,3 +48,9 @@ void RenderableComponent::BindTextureToPipeline(VkCommandBuffer cmdBuf, VkPipeli
 	vkCmdPushDescriptorSetKHR(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		pipeline, 1, 1, &write);
 }
+
+void RenderableComponent::DrawWithTextures(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline)
+{
+	BindTextureToPipeline(cmdBuf, pipeline);
+	Draw(cmdBuf);
+}

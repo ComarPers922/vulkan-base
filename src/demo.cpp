@@ -124,6 +124,25 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         }
     }
 
+    auto& secondaryMesh = *secondaryModel.GetRenderable()->GetGPUMesh();
+    {
+        // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
+        // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
+        Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Tank.obj"), 1.f);
+        {
+            const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            secondaryMesh.vertex_buffer = vk_create_buffer(size, usage, mesh.vertices.data(), "2ndary_vertex_buffer");
+            secondaryMesh.vertex_count = uint32_t(mesh.vertices.size());
+        }
+        {
+            const VkDeviceSize size = mesh.indices.size() * sizeof(mesh.indices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            secondaryMesh.index_buffer = vk_create_buffer(size, usage, mesh.indices.data(), "2ndary_index_buffer");
+            secondaryMesh.index_count = uint32_t(mesh.indices.size());
+        }
+    }
+
     // Texture.
     {
         // texture = vk_load_texture(get_resource_path("model/diffuse.jpg"));
@@ -133,6 +152,10 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         auto& modelTexture = mainModel.GetRenderable()->GetTexture();
         auto tempImage = vk_load_texture(get_resource_path("model/mine_craft_castle.jpg"));
         modelTexture = std::make_unique<Vk_Image>(std::move(tempImage));
+
+        auto& secondaryModelTexture = secondaryModel.GetRenderable()->GetTexture();
+        auto secondaryTempImage = vk_load_texture(get_resource_path("model/Tank_Base_color.png"));
+        secondaryModelTexture = std::make_unique<Vk_Image>(std::move(secondaryTempImage));
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
@@ -438,6 +461,7 @@ void Vk_Demo::shutdown() {
     release_resolution_dependent_resources();
     quad_mesh.destroy();
     // mainModel.GetRenderable()->GetTexture()->destroy();
+    secondaryModel.Destroy();
     mainModel.Destroy();
     // secondaryTexture.destroy();
     texture.destroy();
@@ -665,9 +689,10 @@ void Vk_Demo::draw_frame() {
     auto renderable = mainModel.GetRenderable();
     if (renderable)
     {
-        renderable->BindTextureToPipeline(vk.command_buffer, pipeline_layout);
-        renderable->Draw(vk.command_buffer);
+        renderable->DrawWithTextures(vk.command_buffer, pipeline_layout);
     }
+
+    secondaryModel.GetRenderable()->DrawWithTextures(vk.command_buffer, pipeline_layout);
 
 
     vkCmdEndRendering(vk.command_buffer);

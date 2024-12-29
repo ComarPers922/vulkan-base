@@ -78,6 +78,7 @@ private:
 
     // GPU_MESH gpu_mesh;
     GameObject mainModel;
+    GameObject secondaryModel;
     GPU_MESH quad_mesh;
 
     TAATransform main_frame_uniform;
