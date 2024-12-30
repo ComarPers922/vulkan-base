@@ -122,6 +122,11 @@ Matrix4x4& Matrix4x4::operator=(const Matrix4x4& other)
     return *this;
 }
 
+float* Matrix4x4::operator[](const size_t& index)
+{
+    return a[index];
+}
+
 Matrix3x4 operator*(const Matrix3x4& m1, const Matrix3x4& m2) {
     Matrix3x4 m;
     m.a[0][0] = m1.a[0][0] * m2.a[0][0] + m1.a[0][1] * m2.a[1][0] + m1.a[0][2] * m2.a[2][0];
@@ -161,6 +166,11 @@ Matrix3x4 Matrix3x4::operator*(const float& num) const
     return m;
 }
 
+float* Matrix3x4::operator[](const size_t& index)
+{
+    return a[index];
+}
+
 Matrix4x4 operator*(const Matrix4x4& m1, const Matrix3x4& m2) {
     Matrix4x4 m;
     m.a[0][0] = m1.a[0][0] * m2.a[0][0] + m1.a[0][1] * m2.a[1][0] + m1.a[0][2] * m2.a[2][0];
@@ -183,6 +193,24 @@ Matrix4x4 operator*(const Matrix4x4& m1, const Matrix3x4& m2) {
     m.a[3][2] = m1.a[3][0] * m2.a[0][2] + m1.a[3][1] * m2.a[1][2] + m1.a[3][2] * m2.a[2][2];
     m.a[3][3] = m1.a[3][0] * m2.a[0][3] + m1.a[3][1] * m2.a[1][3] + m1.a[3][2] * m2.a[2][3] + m1.a[3][3];
     return m;
+}
+
+Matrix4x4 operator*(const Matrix4x4& m1, const Matrix4x4& m2)
+{
+    Matrix4x4 result;
+    for (int row = 0; row < 4; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            result[row][col] = 0.f;
+        }
+    }
+    for (int row = 0; row < 4; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            for (int k = 0; k < 4; ++k) {
+                result[row][col] += m1.a[row][k] * m2.a[k][col];
+            }
+        }
+    }
+    return result;
 }
 
 Matrix3x4 get_inverse(const Matrix3x4& m) {
@@ -261,6 +289,32 @@ Matrix3x4 rotate_z(const Matrix3x4& m, float angle) {
     m2.a[2][1] = m.a[2][1];
     m2.a[2][2] = m.a[2][2];
     m2.a[2][3] = m.a[2][3];
+    return m2;
+}
+
+Matrix4x4 rotate_y(const Matrix4x4& m, float angle)
+{
+    float cs = std::cos(angle);
+    float sn = std::sin(angle);
+
+    Matrix4x4 m2;
+    m2.a[0][0] = cs * m.a[0][0] + sn * m.a[2][0];
+    m2.a[0][1] = cs * m.a[0][1] + sn * m.a[2][1];
+    m2.a[0][2] = cs * m.a[0][2] + sn * m.a[2][2];
+    m2.a[0][3] = cs * m.a[0][3] + sn * m.a[2][3];
+
+    m2.a[1][0] = m.a[1][0];
+    m2.a[1][1] = m.a[1][1];
+    m2.a[1][2] = m.a[1][2];
+    m2.a[1][3] = m.a[1][3];
+
+    m2.a[2][0] = -sn * m.a[0][0] + cs * m.a[2][0];
+    m2.a[2][1] = -sn * m.a[0][1] + cs * m.a[2][1];
+    m2.a[2][2] = -sn * m.a[0][2] + cs * m.a[2][2];
+    m2.a[2][3] = -sn * m.a[0][3] + cs * m.a[2][3];
+
+    m2.a[3][0] = m2.a[3][1] = m2.a[3][2] = 0.f;
+    m2.a[3][3] = 1.f;
     return m2;
 }
 

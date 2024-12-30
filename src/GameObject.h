@@ -1,6 +1,8 @@
 #include "BaseObject.h"
 #include "RenderableComponent.h"
 
+class TransformComponent;
+
 class GameObject: public BaseObject
 {
 public:
@@ -18,4 +20,5 @@ public:
 	DEFAULT_DESTRUCTOR_OBJECT(GameObject)
 private:
 	std::weak_ptr<RenderableComponent> RenderableComponent;
+	std::weak_ptr<TransformComponent> TransformComponent;
 };

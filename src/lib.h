@@ -269,6 +269,7 @@ struct Matrix3x4 {
     Vector4 get_row(int row) const;
 
     Matrix3x4 operator*(const float& scale) const;
+    float* operator[](const size_t& index);
 };
 
 struct Matrix4x4 {
@@ -276,10 +277,12 @@ struct Matrix4x4 {
     static const Matrix4x4 identity;
 
     Matrix4x4& operator= (const Matrix4x4& other);
+    float* operator[](const size_t& index);
 };
 
 Matrix3x4 operator*(const Matrix3x4& m1, const Matrix3x4& m2);
 Matrix4x4 operator*(const Matrix4x4& m1, const Matrix3x4& m2);
+Matrix4x4 operator*(const Matrix4x4& m1, const Matrix4x4& m2);
 
 // assumption is that matrix contains only rotation and translation.
 Matrix3x4 get_inverse(const Matrix3x4& m);
@@ -289,6 +292,7 @@ Matrix3x4 rotate_x(const Matrix3x4& m, float angle);
 Matrix3x4 rotate_y(const Matrix3x4& m, float angle);
 Matrix3x4 rotate_z(const Matrix3x4& m, float angle);
 
+Matrix4x4 rotate_y(const Matrix4x4& m, float angle);
 // Computes world space->eye space transform that positions the camera at point 'from'
 // and orients its direction towards the point 'to'. 'up' unit vector specifies reference up direction.
 Matrix3x4 look_at_transform(Vector3 from, Vector3 to, Vector3 up);

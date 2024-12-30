@@ -20,6 +20,8 @@ set(PROGRAM_SOURCE
     src/Mesh.cpp
     src/GameObject.h
     src/GameObject.cpp
+    src/TransformComponent.h
+    src/TransformComponent.cpp
 )
 set(SHADER_SOURCE
     src/shaders/mesh.vert.glsl

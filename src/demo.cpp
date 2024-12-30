@@ -574,7 +574,12 @@ void Vk_Demo::run_frame() {
 	float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
 	Matrix4x4 projection_transform = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
 	Matrix3x4 view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
-    Matrix3x4 model_transform = rotate_y(Matrix3x4::identity * scale, (float)sim_time * radians(20.0f));
+    auto model_transform = Matrix4x4::identity;
+    model_transform[0][3] = 1.f;
+    model_transform = rotate_y(model_transform, (float)sim_time * radians(20.0f));
+    model_transform[0][0] *= scale;
+    model_transform[1][1] *= scale;
+    model_transform[2][2] *= scale;
     Matrix4x4 model_view_proj = projection_transform * view_transform * model_transform;
 
     main_frame_uniform.cur = model_view_proj;

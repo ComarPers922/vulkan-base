@@ -21,8 +21,6 @@ public:
         return mTexture;
     }
 
-    Transform Transform;
-
     virtual void Destroy() override;
 
     virtual void Draw(VkCommandBuffer cmdBuf);
