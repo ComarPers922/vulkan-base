@@ -292,6 +292,31 @@ Matrix3x4 rotate_z(const Matrix3x4& m, float angle) {
     return m2;
 }
 
+Matrix4x4 rotate_x(const Matrix4x4& m, float angle) {
+    float cs = std::cos(angle);
+    float sn = std::sin(angle);
+
+    Matrix4x4 m2;
+    m2.a[0][0] = m.a[0][0];
+    m2.a[0][1] = m.a[0][1];
+    m2.a[0][2] = m.a[0][2];
+    m2.a[0][3] = m.a[0][3];
+
+    m2.a[1][0] = cs * m.a[1][0] - sn * m.a[2][0];
+    m2.a[1][1] = cs * m.a[1][1] - sn * m.a[2][1];
+    m2.a[1][2] = cs * m.a[1][2] - sn * m.a[2][2];
+    m2.a[1][3] = cs * m.a[1][3] - sn * m.a[2][3];
+
+    m2.a[2][0] = sn * m.a[1][0] + cs * m.a[2][0];
+    m2.a[2][1] = sn * m.a[1][1] + cs * m.a[2][1];
+    m2.a[2][2] = sn * m.a[1][2] + cs * m.a[2][2];
+    m2.a[2][3] = sn * m.a[1][3] + cs * m.a[2][3];
+
+    m2.a[3][0] = m2.a[3][1] = m2.a[3][2] = 0.f;
+    m2.a[3][3] = 1.f;
+    return m2;
+}
+
 Matrix4x4 rotate_y(const Matrix4x4& m, float angle)
 {
     float cs = std::cos(angle);
@@ -312,6 +337,31 @@ Matrix4x4 rotate_y(const Matrix4x4& m, float angle)
     m2.a[2][1] = -sn * m.a[0][1] + cs * m.a[2][1];
     m2.a[2][2] = -sn * m.a[0][2] + cs * m.a[2][2];
     m2.a[2][3] = -sn * m.a[0][3] + cs * m.a[2][3];
+
+    m2.a[3][0] = m2.a[3][1] = m2.a[3][2] = 0.f;
+    m2.a[3][3] = 1.f;
+    return m2;
+}
+
+Matrix4x4 rotate_z(const Matrix4x4& m, float angle) {
+    float cs = std::cos(angle);
+    float sn = std::sin(angle);
+
+    Matrix4x4 m2;
+    m2.a[0][0] = cs * m.a[0][0] - sn * m.a[1][0];
+    m2.a[0][1] = cs * m.a[0][1] - sn * m.a[1][1];
+    m2.a[0][2] = cs * m.a[0][2] - sn * m.a[1][2];
+    m2.a[0][3] = cs * m.a[0][3] - sn * m.a[1][3];
+
+    m2.a[1][0] = sn * m.a[0][0] + cs * m.a[1][0];
+    m2.a[1][1] = sn * m.a[0][1] + cs * m.a[1][1];
+    m2.a[1][2] = sn * m.a[0][2] + cs * m.a[1][2];
+    m2.a[1][3] = sn * m.a[0][3] + cs * m.a[1][3];
+
+    m2.a[2][0] = m.a[2][0];
+    m2.a[2][1] = m.a[2][1];
+    m2.a[2][2] = m.a[2][2];
+    m2.a[2][3] = m.a[2][3];
 
     m2.a[3][0] = m2.a[3][1] = m2.a[3][2] = 0.f;
     m2.a[3][3] = 1.f;
@@ -457,3 +507,4 @@ Triangle_Mesh load_obj_model(const std::string& path, float additional_scale) {
 }
 
 const Vector3 Vector3::ZERO = Vector3(0, 0, 0);
+const Vector3 Vector3::ONE = Vector3(1, 1, 1);

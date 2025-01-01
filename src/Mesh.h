@@ -7,7 +7,25 @@ struct Transform
 {
     Vector3 position = Vector3::ZERO;
     float pitch = 0.0f, yaw = 0.0f, roll = 0.0f;
-    Vector3 scale = Vector3::ZERO;
+    Vector3 scale = Vector3::ONE;
+
+    Transform() = default;
+
+    Transform(const Transform& other)
+    {
+        *this = other;
+    }
+
+    Transform& operator= (const Transform& other)
+    {
+        position = other.position;
+        pitch = other.pitch;
+        yaw = other.yaw;
+        roll = other.roll;
+        scale = other.scale;
+
+        return *this;
+    }
 };
 
 struct TAATransform

@@ -8,6 +8,7 @@
 #include <array>
 
 #include "Constants.h"
+#include "TransformComponent.h"
 
 static VkFormat get_depth_image_format() {
     VkFormat candidates[2] = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_X8_D24_UNORM_PACK32 };
@@ -203,6 +204,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
 
     main_texture_descriptor_set_layout = Vk_Descriptor_Set_Layout()
         .sampled_image(0, VK_SHADER_STAGE_FRAGMENT_BIT)
+		.uniform_buffer(1, VK_SHADER_STAGE_VERTEX_BIT)
         .create("main_texture_set_layout", true);
 
     post_process_descriptor_set_layout = Vk_Descriptor_Set_Layout()
@@ -574,12 +576,20 @@ void Vk_Demo::run_frame() {
 	float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
 	Matrix4x4 projection_transform = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
 	Matrix3x4 view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
-    auto model_transform = Matrix4x4::identity;
-    model_transform[0][3] = 1.f;
-    model_transform = rotate_y(model_transform, (float)sim_time * radians(20.0f));
-    model_transform[0][0] *= scale;
-    model_transform[1][1] *= scale;
-    model_transform[2][2] *= scale;
+    //auto model_transform = Matrix4x4::identity;
+    //model_transform[0][3] = 1.f;
+    //model_transform = rotate_y(model_transform, (float)sim_time * radians(20.0f));
+    //model_transform[0][0] *= scale;
+    //model_transform[1][1] *= scale;
+    //model_transform[2][2] *= scale;
+    auto transformComp = mainModel.GetTransform();
+    if (animate)
+    {
+		transformComp->Transform.yaw += static_cast<float>(time_delta) * 20.f;
+    }
+    transformComp->Transform.scale = scale;
+
+    auto model_transform = transformComp->ProduceModelTransform();
     Matrix4x4 model_view_proj = projection_transform * view_transform * model_transform;
 
     main_frame_uniform.cur = model_view_proj;
@@ -694,10 +704,12 @@ void Vk_Demo::draw_frame() {
     auto renderable = mainModel.GetRenderable();
     if (renderable)
     {
-        renderable->DrawWithTextures(vk.command_buffer, pipeline_layout);
+        // renderable->DrawWithTextures(vk.command_buffer, pipeline_layout);
+        mainModel.DrawGameObject(vk.command_buffer, pipeline_layout);
     }
 
-    secondaryModel.GetRenderable()->DrawWithTextures(vk.command_buffer, pipeline_layout);
+    // secondaryModel.GetRenderable()->DrawWithTextures(vk.command_buffer, pipeline_layout);
+    secondaryModel.DrawGameObject(vk.command_buffer, pipeline_layout);
 
 
     vkCmdEndRendering(vk.command_buffer);

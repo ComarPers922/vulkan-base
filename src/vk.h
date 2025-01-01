@@ -281,7 +281,7 @@ struct Vk_Shader_Module {
 
 struct Vk_Descriptor_Set_Layout {
     static constexpr uint32_t max_bindings = 32;
-    std::array<VkDescriptorSetLayoutBinding, max_bindings> bindings;
+    std::array<VkDescriptorSetLayoutBinding, max_bindings> bindings{ };
     uint32_t binding_count = 0;
 
     Vk_Descriptor_Set_Layout& sampled_image(uint32_t binding, VkShaderStageFlags stage_flags);

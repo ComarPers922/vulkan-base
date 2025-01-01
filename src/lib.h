@@ -69,6 +69,7 @@ struct Vector4;
 
 struct Vector3 {
     static const Vector3 ZERO;
+    static const Vector3 ONE;
 
     float x, y, z;
 
@@ -101,6 +102,14 @@ struct Vector3 {
 
     float& operator[](int index) {
         return (&x)[index];
+    }
+
+    Vector3& operator= (const float& v)
+    {
+        x = v;
+        y = v;
+    	z = v;
+        return *this;
     }
 
     Vector3& operator+=(const Vector3& v) {
@@ -292,7 +301,9 @@ Matrix3x4 rotate_x(const Matrix3x4& m, float angle);
 Matrix3x4 rotate_y(const Matrix3x4& m, float angle);
 Matrix3x4 rotate_z(const Matrix3x4& m, float angle);
 
+Matrix4x4 rotate_x(const Matrix4x4& m, float angle);
 Matrix4x4 rotate_y(const Matrix4x4& m, float angle);
+Matrix4x4 rotate_z(const Matrix4x4& m, float angle);
 // Computes world space->eye space transform that positions the camera at point 'from'
 // and orients its direction towards the point 'to'. 'up' unit vector specifies reference up direction.
 Matrix3x4 look_at_transform(Vector3 from, Vector3 to, Vector3 up);

@@ -13,3 +13,13 @@ GameObject::GameObject()
 	components.emplace_back(std::move(newTransform));
 	TransformComponent = std::dynamic_pointer_cast<class TransformComponent>(components.back());
 }
+
+void GameObject::DrawGameObject(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline)
+{
+	auto renderable = GetRenderable();
+	if (renderable)
+	{
+		RenderInfo testInfo{};
+		renderable->DrawWithTextures(cmdBuf, &testInfo, pipeline);
+	}
+}

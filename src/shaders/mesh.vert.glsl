@@ -12,11 +12,17 @@ layout(std140, binding=0) uniform Uniform_Block {
     mat4x4 history_model_view_proj;
 };
 
+layout(std140, set=1,binding=1) uniform ModelMatrices
+{
+    mat4x4 currentModelMat;
+    mat4x4 previousModelMat;
+};
+
 void main() {
     frag_uv = in_uv;
     gl_Position = model_view_proj * in_position;
 
-    // history_clipPos = history_model_view_proj * in_position;
-    history_clipPos = gl_Position;
+    history_clipPos = history_model_view_proj * in_position;
+    // history_clipPos = gl_Position;
     clipPos = gl_Position;
 }

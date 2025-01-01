@@ -9,4 +9,6 @@ public:
 
 	Transform Transform;
 	DEFAULT_DESTRUCTOR_COMPONENT(TransformComponent)
+
+	Matrix4x4 ProduceModelTransform();
 };

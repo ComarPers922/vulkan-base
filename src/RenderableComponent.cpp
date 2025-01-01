@@ -5,7 +5,7 @@ RenderableComponent::RenderableComponent():
 	mMesh(std::make_unique<GPU_MESH>())
 	// mTexture(std::make_unique<Vk_Image>())
 {
-	
+
 }
 
 void RenderableComponent::Destroy()
@@ -21,9 +21,10 @@ void RenderableComponent::Destroy()
 		mTexture->destroy();
 		mTexture = nullptr;
 	}
+	mRenderInfoBuffer.destroy();
 }
 
-void RenderableComponent::Draw(VkCommandBuffer cmdBuf)
+void RenderableComponent::Draw(VkCommandBuffer cmdBuf, RenderInfo* renderInfo)
 {
 	const VkDeviceSize zero_offset = 0;
 
@@ -34,7 +35,7 @@ void RenderableComponent::Draw(VkCommandBuffer cmdBuf)
 
 void RenderableComponent::BindTextureToPipeline(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline)
 {
-	auto imageInfo = VkDescriptorImageInfo{ VK_NULL_HANDLE,
+	const auto imageInfo = VkDescriptorImageInfo{ VK_NULL_HANDLE,
 	   mTexture->view,
 	   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 	auto write = VkWriteDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
@@ -49,8 +50,37 @@ void RenderableComponent::BindTextureToPipeline(VkCommandBuffer cmdBuf, VkPipeli
 		pipeline, 1, 1, &write);
 }
 
-void RenderableComponent::DrawWithTextures(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline)
+void RenderableComponent::PushModelMatrixToPipeline(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline, RenderInfo* renderInfo)
 {
+	memcpy(mMappedRenderInfoBuffer, renderInfo, sizeof(RenderInfo));
+	const auto bufferInfo = VkDescriptorBufferInfo{
+		mRenderInfoBuffer.handle,
+		0,
+		sizeof(RenderInfo),
+	};
+
+	auto write = VkWriteDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+	write.descriptorCount = 1;
+	write.dstBinding = 1;
+	write.pBufferInfo = &bufferInfo;
+	write.dstSet = VK_NULL_HANDLE;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+	vkCmdPushDescriptorSetKHR(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		pipeline, 1, 1, &write);
+}
+
+void RenderableComponent::DrawWithTextures(VkCommandBuffer cmdBuf, RenderInfo* renderInfo, VkPipelineLayout pipeline)
+{
+	if (renderInfo)
+	{
+		if (!mRenderInfoBuffer.handle)
+		{
+			mRenderInfoBuffer = vk_create_mapped_buffer(sizeof(RenderInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				&mMappedRenderInfoBuffer, "RenderInfo");
+		}
+		PushModelMatrixToPipeline(cmdBuf, pipeline, renderInfo);
+	}
 	BindTextureToPipeline(cmdBuf, pipeline);
-	Draw(cmdBuf);
+	Draw(cmdBuf, renderInfo);
 }

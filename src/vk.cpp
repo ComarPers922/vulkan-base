@@ -177,6 +177,10 @@ void Vk_Image::destroy()
 
 void Vk_Buffer::destroy()
 {
+    if (!handle)
+    {
+        return;
+    }
     vmaDestroyBuffer(vk.allocator, handle, allocation);
     *this = Vk_Buffer{};
 }
