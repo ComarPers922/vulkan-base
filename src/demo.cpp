@@ -125,7 +125,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         }
     }
 
-    auto& secondaryMesh = *tankModel.GetRenderable()->GetGPUMesh();
+    auto& tankMesh = *tankModel.GetRenderable()->GetGPUMesh();
     {
         // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
         // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
@@ -133,14 +133,33 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         {
             const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
             VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            secondaryMesh.vertex_buffer = vk_create_buffer(size, usage, mesh.vertices.data(), "2ndary_vertex_buffer");
-            secondaryMesh.vertex_count = uint32_t(mesh.vertices.size());
+            tankMesh.vertex_buffer = vk_create_buffer(size, usage, mesh.vertices.data(), "tank_vertex_buffer");
+            tankMesh.vertex_count = uint32_t(mesh.vertices.size());
         }
         {
             const VkDeviceSize size = mesh.indices.size() * sizeof(mesh.indices[0]);
             VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-            secondaryMesh.index_buffer = vk_create_buffer(size, usage, mesh.indices.data(), "2ndary_index_buffer");
-            secondaryMesh.index_count = uint32_t(mesh.indices.size());
+            tankMesh.index_buffer = vk_create_buffer(size, usage, mesh.indices.data(), "tank_index_buffer");
+            tankMesh.index_count = uint32_t(mesh.indices.size());
+        }
+    }
+
+    auto& balooMesh = *balooModel.GetRenderable()->GetGPUMesh();
+    {
+        // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
+        // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
+        Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
+        {
+            const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            balooMesh.vertex_buffer = vk_create_buffer(size, usage, mesh.vertices.data(), "baloo_vertex_buffer");
+            balooMesh.vertex_count = uint32_t(mesh.vertices.size());
+        }
+        {
+            const VkDeviceSize size = mesh.indices.size() * sizeof(mesh.indices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            balooMesh.index_buffer = vk_create_buffer(size, usage, mesh.indices.data(), "baloo_index_buffer");
+            balooMesh.index_count = uint32_t(mesh.indices.size());
         }
     }
 
@@ -156,10 +175,15 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         castleModel.GetTransform()->Transform.position.x = -.5f;
 
 
-        auto& secondaryModelTexture = tankModel.GetRenderable()->GetTexture();
-        auto secondaryTempImage = vk_load_texture(get_resource_path("model/Tank_Base_color.png"));
-        secondaryModelTexture = std::make_unique<Vk_Image>(std::move(secondaryTempImage));
+        auto& tankModelTexture = tankModel.GetRenderable()->GetTexture();
+        auto tankTempImage = vk_load_texture(get_resource_path("model/Tank_Base_color.png"));
+        tankModelTexture = std::make_unique<Vk_Image>(std::move(tankTempImage));
         tankModel.GetTransform()->Transform.position.x = .5f;
+
+        auto& balooModelTexture = balooModel.GetRenderable()->GetTexture();
+        auto balooTempImage = vk_load_texture(get_resource_path("model/baloo_diff.png"));
+        balooModelTexture = std::make_unique<Vk_Image>(std::move(balooTempImage));
+        balooModel.GetTransform()->Transform.position.z = -2.f;
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
@@ -468,6 +492,7 @@ void Vk_Demo::shutdown() {
     // castleModel.GetRenderable()->GetTexture()->destroy();
     tankModel.Destroy();
     castleModel.Destroy();
+    balooModel.Destroy();
     // secondaryTexture.destroy();
     texture.destroy();
     post_process_descriptor_buffer.destroy();
@@ -587,10 +612,12 @@ void Vk_Demo::run_frame() {
     //model_transform[2][2] *= scale;
     auto castleTransform = castleModel.GetTransform();
     auto tankTransform = tankModel.GetTransform();
+    auto balooTransform = balooModel.GetTransform();
     if (animate)
     {
 		castleTransform->Transform.yaw += static_cast<float>(time_delta) * 20.f;
         tankTransform->Transform.yaw -= static_cast<float>(time_delta) * 20.f;
+        balooTransform->Transform.yaw = sin(static_cast<float>(sim_time)) * 20.f;
     }
     castleTransform->Transform.scale = scale;
     tankTransform->Transform.scale = scale;
@@ -714,6 +741,8 @@ void Vk_Demo::draw_frame() {
         // renderable->DrawWithTextures(vk.command_buffer, pipeline_layout);
         castleModel.DrawGameObject(vk.command_buffer, pipeline_layout);
     }
+
+    balooModel.DrawGameObject(vk.command_buffer, pipeline_layout);
 
     // tankModel.GetRenderable()->DrawWithTextures(vk.command_buffer, pipeline_layout);
     tankModel.DrawGameObject(vk.command_buffer, pipeline_layout);

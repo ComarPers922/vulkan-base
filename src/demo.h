@@ -79,6 +79,7 @@ private:
     // GPU_MESH gpu_mesh;
     GameObject castleModel;
     GameObject tankModel;
+    GameObject balooModel;
     GPU_MESH quad_mesh;
 
     TAATransform main_frame_uniform;
