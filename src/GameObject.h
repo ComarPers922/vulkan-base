@@ -10,28 +10,29 @@ public:
 
 	std::shared_ptr<RenderableComponent> GetRenderable()
 	{
-		if (RenderableComponent.expired())
+		if (mRenderableComponent.expired())
 		{
 			return nullptr;
 		}
-		return RenderableComponent.lock();
+		return mRenderableComponent.lock();
 	}
 
 	std::shared_ptr<TransformComponent> GetTransform()
 	{
-		if (TransformComponent.expired())
+		if (mTransformComponent.expired())
 		{
 			return nullptr;
 		}
-		return TransformComponent.lock();
+		return mTransformComponent.lock();
 	}
 
 	void DrawGameObject(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline);
 
 	DEFAULT_DESTRUCTOR_OBJECT(GameObject)
 private:
-	std::weak_ptr<RenderableComponent> RenderableComponent;
-	std::weak_ptr<TransformComponent> TransformComponent;
+	std::weak_ptr<RenderableComponent> mRenderableComponent;
+	std::weak_ptr<TransformComponent> mTransformComponent;
 
-	Matrix4x4 PreviousModelMatrix;
+	// Matrix4x4 PreviousModelMatrix;
+	RenderInfo mRenderInfo;
 };

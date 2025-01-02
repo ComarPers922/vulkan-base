@@ -155,7 +155,7 @@ void main()
         prevColor.rgb = clamp(prevColor.rgb, BoxMin, BoxMax);
 
         const float blendFactor = 0.9;
-        // color_attachment0 = mix(curColor, prevColor, blendFactor - mix(0., blendFactor, saturate(length(offset)) * 50.));
+        // color_attachment0 = mix(curColor, prevColor, blendFactor - mix(0., blendFactor, saturate(length(offset))));
         color_attachment0 = mix(curColor, prevColor, blendFactor);
         return;
     }

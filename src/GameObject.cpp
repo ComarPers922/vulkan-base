@@ -7,19 +7,20 @@ GameObject::GameObject()
 {
 	auto newRenderable = std::make_shared<class RenderableComponent>();
 	components.emplace_back(std::move(newRenderable));
-	RenderableComponent = std::dynamic_pointer_cast<class RenderableComponent>(components.back());
+	mRenderableComponent = std::dynamic_pointer_cast<class RenderableComponent>(components.back());
 
 	auto newTransform = std::make_shared<class TransformComponent>();
 	components.emplace_back(std::move(newTransform));
-	TransformComponent = std::dynamic_pointer_cast<class TransformComponent>(components.back());
+	mTransformComponent = std::dynamic_pointer_cast<class TransformComponent>(components.back());
 }
 
 void GameObject::DrawGameObject(VkCommandBuffer cmdBuf, VkPipelineLayout pipeline)
 {
+	mRenderInfo.CurrentModelMatrix = GetTransform()->ProduceModelTransform();
 	auto renderable = GetRenderable();
 	if (renderable)
 	{
-		RenderInfo testInfo{};
-		renderable->DrawWithTextures(cmdBuf, &testInfo, pipeline);
+		renderable->DrawWithTextures(cmdBuf, &mRenderInfo, pipeline);
 	}
+	mRenderInfo.PreviousModelMatrix = mRenderInfo.CurrentModelMatrix;
 }

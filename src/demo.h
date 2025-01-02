@@ -39,7 +39,7 @@ private:
     bool animate = false;
     int aliasingOption = 1;
     float threshold = 0.1f;
-    float scale = 1.f;
+    float scale = .3f;
     uint32_t frameIndex;
 
     double time_delta;
@@ -77,8 +77,8 @@ private:
     VkSampler nearest_sampler;
 
     // GPU_MESH gpu_mesh;
-    GameObject mainModel;
-    GameObject secondaryModel;
+    GameObject castleModel;
+    GameObject tankModel;
     GPU_MESH quad_mesh;
 
     TAATransform main_frame_uniform;

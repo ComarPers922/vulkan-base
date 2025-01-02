@@ -92,7 +92,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
             VK_VERSION_PATCH(physical_device_properties.properties.apiVersion)
         );
     }
-    auto& gpu_mesh = *mainModel.GetRenderable()->GetGPUMesh();
+    auto& gpu_mesh = *castleModel.GetRenderable()->GetGPUMesh();
     // Geometry buffers.
     {
         // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
@@ -125,7 +125,7 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         }
     }
 
-    auto& secondaryMesh = *secondaryModel.GetRenderable()->GetGPUMesh();
+    auto& secondaryMesh = *tankModel.GetRenderable()->GetGPUMesh();
     {
         // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
         // Triangle_Mesh mesh = load_obj_model(get_resource_path("model/Baloo.obj"), 1.f);
@@ -150,13 +150,16 @@ void Vk_Demo::initialize(GLFWwindow* window) {
         // texture = vk_load_texture(get_resource_path("model/baloo_diff.png"));
         texture = vk_load_texture(get_resource_path("model/mine_craft_castle.jpg"));
 
-        auto& modelTexture = mainModel.GetRenderable()->GetTexture();
+        auto& modelTexture = castleModel.GetRenderable()->GetTexture();
         auto tempImage = vk_load_texture(get_resource_path("model/mine_craft_castle.jpg"));
         modelTexture = std::make_unique<Vk_Image>(std::move(tempImage));
+        castleModel.GetTransform()->Transform.position.x = -.5f;
 
-        auto& secondaryModelTexture = secondaryModel.GetRenderable()->GetTexture();
+
+        auto& secondaryModelTexture = tankModel.GetRenderable()->GetTexture();
         auto secondaryTempImage = vk_load_texture(get_resource_path("model/Tank_Base_color.png"));
         secondaryModelTexture = std::make_unique<Vk_Image>(std::move(secondaryTempImage));
+        tankModel.GetTransform()->Transform.position.x = .5f;
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
@@ -462,9 +465,9 @@ void Vk_Demo::shutdown() {
     post_process_image.destroy();
     release_resolution_dependent_resources();
     quad_mesh.destroy();
-    // mainModel.GetRenderable()->GetTexture()->destroy();
-    secondaryModel.Destroy();
-    mainModel.Destroy();
+    // castleModel.GetRenderable()->GetTexture()->destroy();
+    tankModel.Destroy();
+    castleModel.Destroy();
     // secondaryTexture.destroy();
     texture.destroy();
     post_process_descriptor_buffer.destroy();
@@ -582,15 +585,19 @@ void Vk_Demo::run_frame() {
     //model_transform[0][0] *= scale;
     //model_transform[1][1] *= scale;
     //model_transform[2][2] *= scale;
-    auto transformComp = mainModel.GetTransform();
+    auto castleTransform = castleModel.GetTransform();
+    auto tankTransform = tankModel.GetTransform();
     if (animate)
     {
-		transformComp->Transform.yaw += static_cast<float>(time_delta) * 20.f;
+		castleTransform->Transform.yaw += static_cast<float>(time_delta) * 20.f;
+        tankTransform->Transform.yaw -= static_cast<float>(time_delta) * 20.f;
     }
-    transformComp->Transform.scale = scale;
+    castleTransform->Transform.scale = scale;
+    tankTransform->Transform.scale = scale;
 
-    auto model_transform = transformComp->ProduceModelTransform();
-    Matrix4x4 model_view_proj = projection_transform * view_transform * model_transform;
+    auto model_transform = castleTransform->ProduceModelTransform();
+    // Matrix4x4 model_view_proj = projection_transform * view_transform * model_transform;
+    Matrix4x4 model_view_proj = projection_transform * view_transform;// *model_transform;
 
     main_frame_uniform.cur = model_view_proj;
 
@@ -663,7 +670,7 @@ void Vk_Demo::draw_frame() {
 
     vk_begin_gpu_marker_scope(vk.command_buffer, "Draw main frame");
 
-    // auto& gpu_mesh = *mainModel.GetRenderable()->GetGPUMesh();
+    // auto& gpu_mesh = *castleModel.GetRenderable()->GetGPUMesh();
 
 	color_attachment_transition_for_copy_src();
 
@@ -688,7 +695,7 @@ void Vk_Demo::draw_frame() {
     //vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
 
     //auto imageInfo = VkDescriptorImageInfo{ VK_NULL_HANDLE,
-    //    mainModel.GetRenderable()->GetTexture()->view,
+    //    castleModel.GetRenderable()->GetTexture()->view,
     //    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
     //auto write = VkWriteDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
 
@@ -701,15 +708,15 @@ void Vk_Demo::draw_frame() {
     //vkCmdPushDescriptorSetKHR(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
     //    pipeline_layout, 1, 1, &write);
 
-    auto renderable = mainModel.GetRenderable();
+    auto renderable = castleModel.GetRenderable();
     if (renderable)
     {
         // renderable->DrawWithTextures(vk.command_buffer, pipeline_layout);
-        mainModel.DrawGameObject(vk.command_buffer, pipeline_layout);
+        castleModel.DrawGameObject(vk.command_buffer, pipeline_layout);
     }
 
-    // secondaryModel.GetRenderable()->DrawWithTextures(vk.command_buffer, pipeline_layout);
-    secondaryModel.DrawGameObject(vk.command_buffer, pipeline_layout);
+    // tankModel.GetRenderable()->DrawWithTextures(vk.command_buffer, pipeline_layout);
+    tankModel.DrawGameObject(vk.command_buffer, pipeline_layout);
 
 
     vkCmdEndRendering(vk.command_buffer);

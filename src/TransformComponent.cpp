@@ -18,8 +18,8 @@ Matrix4x4 TransformComponent::ProduceModelTransform()
     model_transform = rotate_z(model_transform,  radians(Transform.roll));
 
     model_transform[0][3] = Transform.position.x;
-    model_transform[0][3] = Transform.position.y;
-    model_transform[0][3] = Transform.position.z;
+    model_transform[1][3] = Transform.position.y;
+    model_transform[2][3] = Transform.position.z;
 
     return model_transform;
 }
