@@ -77,6 +77,7 @@ static void create_device(const Vk_Init_Params& params, GLFWwindow* window)
         VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &gpu_count, physical_devices.data()));
 
         int selected_gpu = -1;
+        int potential_gpu = -1;
         VkPhysicalDeviceProperties gpu_properties{};
 
         if (params.physical_device_index != -1) {
@@ -91,11 +92,19 @@ static void create_device(const Vk_Init_Params& params, GLFWwindow* window)
             for (const auto& physical_device : physical_devices) {
                 vkGetPhysicalDeviceProperties(physical_device, &gpu_properties);
                 if (VK_VERSION_MAJOR(gpu_properties.apiVersion) == 1 && VK_VERSION_MINOR(gpu_properties.apiVersion) >= 3) {
-                    selected_gpu = int(&physical_device - physical_devices.data());
-                    break;
+                    if (potential_gpu == -1) {
+                        potential_gpu = int(&physical_device - physical_devices.data());
+                    }
+                    // If we got a discrete GPU, pick it!
+                    if (gpu_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+                        selected_gpu = int(&physical_device - physical_devices.data());
+                        break;
+                    }
                 }
             }
         }
+
+        selected_gpu = selected_gpu == -1 ? potential_gpu : selected_gpu;
         if (selected_gpu == -1) {
             vk.error("Failed to select physical device that supports Vulkan 1.3 or higher");
         }
