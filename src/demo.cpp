@@ -6,6 +6,7 @@
 #include "imgui/imgui_impl_glfw.h"
 
 #include <array>
+#include <stb_image_write.h>
 
 #include "Constants.h"
 #include "TransformComponent.h"
@@ -476,6 +477,9 @@ void Vk_Demo::initialize(GLFWwindow* window) {
     restore_resolution_dependent_resources();
     gpu_times.frame = time_keeper.allocate_time_interval();
     time_keeper.initialize_time_intervals();
+
+    screenshot_file_name = "Tank.png";
+    screenshot_file_name.reserve(1024);
 }
 
 void Vk_Demo::shutdown() {
@@ -487,6 +491,7 @@ void Vk_Demo::shutdown() {
     motion_vec_image.destroy();
     prev_frame_image.destroy();
     post_process_image.destroy();
+    screenshot_image.destroy();
     release_resolution_dependent_resources();
     quad_mesh.destroy();
     // castleModel.GetRenderable()->GetTexture()->destroy();
@@ -498,6 +503,7 @@ void Vk_Demo::shutdown() {
     post_process_descriptor_buffer.destroy();
     descriptor_buffer.destroy();
     uniform_buffer.destroy();
+    staging_buffer.destroy();
 
     vkDestroySampler(vk.device, nearest_sampler, nullptr);
     vkDestroySampler(vk.device, linear_sampler, nullptr);
@@ -517,6 +523,9 @@ void Vk_Demo::release_resolution_dependent_resources() {
     prev_frame_image.destroy();
     post_process_image.destroy();
     depth_buffer_image.destroy();
+
+    screenshot_image.destroy();
+    staging_buffer.destroy();
 }
 
 void Vk_Demo::restore_resolution_dependent_resources() {
@@ -532,6 +541,14 @@ void Vk_Demo::restore_resolution_dependent_resources() {
 
         motion_vec_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, "motion_vec");
+
+        screenshot_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_B8G8R8A8_SRGB,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, "screenshot");
+
+        VkDeviceSize buffer_size = vk.surface_size.width * vk.surface_size.height * 4;
+        staging_buffer =
+            vk_create_mapped_buffer(buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, &screenshot_host,
+                "Screenshot host");
     }
     VkDescriptorImageInfo image_info;
     image_info.imageView = post_process_image.view;
@@ -585,6 +602,13 @@ void Vk_Demo::restore_resolution_dependent_resources() {
             VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         });
 
+    vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
+        const VkImageSubresourceRange subresource_range{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+        vk_cmd_image_barrier_for_subresource(command_buffer, screenshot_image.handle, subresource_range,
+            VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        });
+
     last_frame_time = Clock::now();
 }
 
@@ -632,6 +656,31 @@ void Vk_Demo::run_frame() {
 
     do_imgui();
     draw_frame();
+    if (need_screenshot)
+    {
+        vkQueueWaitIdle(vk.queue);
+
+        uint8_t* mapped = reinterpret_cast<uint8_t*>(screenshot_host);
+        std::vector<uint8_t> rgba;
+        rgba.resize(vk.surface_size.width * vk.surface_size.height * 4);
+
+        for (uint32_t i = 0; i < vk.surface_size.width * vk.surface_size.height; ++i) {
+            uint8_t b = mapped[i * 4 + 0];
+            uint8_t g = mapped[i * 4 + 1];
+            uint8_t r = mapped[i * 4 + 2];
+            uint8_t a = mapped[i * 4 + 3];
+            rgba[i * 4 + 0] = r;
+            rgba[i * 4 + 1] = g;
+            rgba[i * 4 + 2] = b;
+            rgba[i * 4 + 3] = a;
+        }
+
+        stbi_write_png(screenshot_file_name.c_str(),
+            vk.surface_size.width,
+            vk.surface_size.height, 4, rgba.data(), static_cast<int>(vk.surface_size.width * 4));
+
+        need_screenshot = false;
+    }
 
     main_frame_uniform.prev = main_frame_uniform.cur;
 }
@@ -836,6 +885,39 @@ void Vk_Demo::draw_frame() {
     //vkCmdDrawIndexed(vk.command_buffer, quad_mesh.index_count, 1, 0, 0, 0);
     //vkCmdEndRendering(vk.command_buffer);
     //vk_end_gpu_marker_scope(vk.command_buffer);
+    if (need_screenshot)
+    {
+        color_attachment_transition_for_copy_src();
+        simple_image_copy(vk.swapchain_info.images[vk.swapchain_image_index],
+            screenshot_image.handle,
+            { vk.surface_size.width, vk.surface_size.height });
+
+        const VkImageSubresourceRange subresource_range{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+        vk_cmd_image_barrier_for_subresource(vk.command_buffer, screenshot_image.handle, subresource_range,
+            VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+        // 拷贝到 Buffer（紧密打包）
+        VkBufferImageCopy region{};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0; // 0 = 使用 imageExtent.width → 紧密打包
+        region.bufferImageHeight = 0; // 0 = 使用 imageExtent.height → 紧密打包
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = { 0,0,0 };
+        region.imageExtent = { vk.surface_size.width, vk.surface_size.height, 1 };
+
+        vkCmdCopyImageToBuffer(vk.command_buffer, screenshot_image.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            staging_buffer.handle, 1, &region);
+
+        vk_cmd_image_barrier_for_subresource(vk.command_buffer, screenshot_image.handle, subresource_range,
+            VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        color_attachment_transition_for_rendering();
+    }
 
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -996,6 +1078,15 @@ void Vk_Demo::do_imgui() {
                 if (ImGui::MenuItem("Bottom-right", NULL, corner == 3)) corner = 3;
                 if (ImGui::MenuItem("Close")) show_ui = false;
                 ImGui::EndPopup();
+            }
+
+            ImGui::Text("Screenshot File Name: ");
+            ImGui::SameLine();
+            ImGui::InputText("##", screenshot_file_name.data(), screenshot_file_name.capacity());
+            ImGui::SameLine();
+            if (ImGui::Button("Take a screenshot!"))
+            {
+                need_screenshot = true;
             }
         }
         ImGui::End();

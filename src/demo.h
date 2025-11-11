@@ -6,6 +6,7 @@
 #include <chrono>
 
 #include "GameObject.h"
+#include "imgui/imgui.h"
 
 struct GLFWwindow;
 
@@ -58,6 +59,14 @@ private:
     Vk_Image post_process_image;
     Vk_Image prev_frame_image;
     Vk_Image motion_vec_image;
+
+    Vk_Buffer staging_buffer;
+    void* screenshot_host;
+    bool need_screenshot = false;
+    std::string screenshot_file_name;
+
+    Vk_Image screenshot_image;
+
     VkDescriptorSetLayout descriptor_set_layout;
     VkDescriptorSetLayout main_texture_descriptor_set_layout;
     VkDescriptorSetLayout post_process_descriptor_set_layout;
